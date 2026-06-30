@@ -1,0 +1,6 @@
+{
+  "name": "LearnWinGrowAfrica",
+  "description": "Talent platform for youth development featuring Aptitude Assessments, Careers Avalanche, Employer Brand Directory, Candidate Dashboard, and Admin Analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
