@@ -1,6 +1,6 @@
 {
-  "name": "LearnWinGrowAfrica",
-  "description": "Talent platform for youth development featuring Aptitude Assessments, Careers Avalanche, Employer Brand Directory, Candidate Dashboard, and Admin Analytics.",
+  "name": "LearnWinGrow Africa | Careers Avalanche",
+  "description": "Learn Win Grow Africa is a talent development, talent engagement and future workforce ecosystem that supports individuals throughout their lifelong learning journey from early childhood development to future leadership while enabling organisations to build sustainable relationships with current and future talent.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
