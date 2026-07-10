@@ -1,0 +1,36 @@
+{
+  "collections": {
+    "pre_registrants": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "email": { "type": "string" },
+          "role": { "type": "string", "enum": ["seeker", "partner"] },
+          "name": { "type": "string" },
+          "province": { "type": "string" },
+          "ageRange": { "type": "string" },
+          "race": { "type": "string" },
+          "nationality": { "type": "string" },
+          "timestamp": { "type": "string" },
+          "referralCode": { "type": "string" },
+          "referredBy": { "type": "string" },
+          "referralsCount": { "type": "number" }
+        },
+        "required": ["email", "role", "name", "timestamp", "referralCode", "referralsCount"]
+      },
+      "indexes": [
+        {
+          "fields": [
+            { "fieldPath": "email", "order": "ASCENDING" }
+          ]
+        },
+        {
+          "fields": [
+            { "fieldPath": "referralCode", "order": "ASCENDING" }
+          ]
+        }
+      ]
+    }
+  },
+  "rules": "rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /pre_registrants/{document} {\n      allow read, write: if true;\n    }\n  }\n}"
+}
