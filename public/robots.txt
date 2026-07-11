@@ -1,6 +1,6 @@
+# https://www.robotstxt.org/robotstxt.html
 User-agent: *
 Allow: /
-Disallow: /admin
-Disallow: /.env
 
-Sitemap: https://learn-win-grow-africa.vercel.app/sitemap.xml
+# Sitemap Location
+Sitemap: https://learnwingrow.africa/sitemap.xml
