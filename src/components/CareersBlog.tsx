@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import DigitalMagazine from './DigitalMagazine';
 import { 
   BookOpen, 
   Search, 
@@ -56,7 +57,7 @@ export default function CareersBlog({ onNavigate }: CareersBlogProps) {
   const [publishSuccess, setPublishSuccess] = useState(false);
 
   // Initial rich set of high-relevance blog articles focused on Careers Avalanche and SA industry partnerships
-  const [articles, setArticles] = useState<BlogPost[]>([
+  const defaultArticles: BlogPost[] = [
     {
       id: 'b1',
       title: "Navigating the 4th Industrial Revolution: A South African Youth Perspective",
@@ -146,7 +147,25 @@ export default function CareersBlog({ onNavigate }: CareersBlogProps) {
       ],
       likes: 51
     }
-  ]);
+  ];
+
+  const [articles, setArticles] = useState<BlogPost[]>(() => {
+    const stored = localStorage.getItem('learnwingrow_blog_articles');
+    return stored ? JSON.parse(stored) : defaultArticles;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('learnwingrow_blog_articles', JSON.stringify(articles));
+  }, [articles]);
+
+  const [activeTab, setActiveTab] = useState<'feed' | 'magazine'>(() => {
+    const saved = sessionStorage.getItem('blog_tab');
+    if (saved === 'magazine' || saved === 'feed') {
+      sessionStorage.removeItem('blog_tab');
+      return saved;
+    }
+    return 'feed';
+  });
 
   const categories = ['All', 'Future Work', 'Technology', 'Career Guidance', 'Partnerships', 'Industry Updates'];
 
@@ -274,8 +293,54 @@ export default function CareersBlog({ onNavigate }: CareersBlogProps) {
                 </p>
               </section>
 
-              {/* Collaborative Partner & Afrihost Domain Meta-Widget */}
-              <section className="bg-gradient-to-r from-indigo-950/30 to-purple-950/30 border border-indigo-500/20 p-6 sm:p-8 rounded-3xl backdrop-blur-md relative overflow-hidden shadow-xl" id="afrihost-meta-widget">
+              {/* Tab Selector */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-white/5 border border-white/10 p-2 rounded-2xl backdrop-blur-md" id="blog-tab-selector-container">
+                <div className="flex items-center gap-2 bg-slate-950/45 p-1 rounded-xl border border-white/5" id="blog-tabs">
+                  <button
+                    onClick={() => setActiveTab('feed')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
+                      activeTab === 'feed'
+                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/15'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <BookOpen className="w-4 h-4" />
+                    <span>Articles & Updates Feed</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('magazine')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
+                      activeTab === 'magazine'
+                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/15'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>Interactive Hybrid Magazine</span>
+                    <span className="bg-orange-500 text-white text-[9px] px-1.5 py-0.5 rounded font-black tracking-widest uppercase animate-pulse">NEW</span>
+                  </button>
+                </div>
+                
+                {/* Social Marketing Facebook link widget */}
+                <div className="flex items-center gap-2" id="blog-facebook-social-cta">
+                  <a 
+                    href="https://www.facebook.com/Careersavalanche"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 bg-[#1877f2]/10 border border-[#1877f2]/30 text-[#1877f2] hover:bg-[#1877f2] hover:text-white transition-all px-4 py-2 rounded-xl text-xs font-extrabold cursor-pointer"
+                  >
+                    <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                      <path d="M22 12c0-5.52-4.48-10-10-10S2 6.48 2 12c0 4.84 3.44 8.87 8 9.8V15H8v-3h2V9.5C10 7.57 11.57 6 13.5 6H16v3h-2c-.55 0-1 .45-1 1v2h3v3h-3v6.95c5.05-.5 9-4.76 9-9.95z" />
+                    </svg>
+                    <span>Follow Careersavalanche</span>
+                  </a>
+                </div>
+              </div>
+
+              {activeTab === 'feed' ? (
+                <>
+                  {/* Collaborative Partner & Afrihost Domain Meta-Widget */}
+                  <section className="bg-gradient-to-r from-indigo-950/30 to-purple-950/30 border border-indigo-500/20 p-6 sm:p-8 rounded-3xl backdrop-blur-md relative overflow-hidden shadow-xl" id="afrihost-meta-widget">
                 <div className="absolute inset-0 bg-indigo-500/5 mix-blend-color-dodge"></div>
                 <div className="relative grid md:grid-cols-12 gap-6 items-center">
                   <div className="md:col-span-8 space-y-3">
@@ -574,6 +639,10 @@ export default function CareersBlog({ onNavigate }: CareersBlogProps) {
                   </div>
                 </div>
               </section>
+                </>
+              ) : (
+                <DigitalMagazine onNavigate={onNavigate} />
+              )}
             </motion.div>
           ) : (
             <motion.div

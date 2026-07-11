@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Sparkles, 
@@ -13,9 +13,16 @@ import {
   Globe, 
   FileText,
   Clock,
-  ArrowUpRight
+  ArrowUpRight,
+  Share2,
+  Copy,
+  Check,
+  MessageCircle,
+  Users,
+  Loader2
 } from 'lucide-react';
 import { AppView } from '../types';
+import { registerPreRegistrant, getTeaserStats, simulateFriendReferral, PreRegistrant } from '../lib/firebase';
 
 interface ComingSoonSplashProps {
   onEnterApp: () => void;
@@ -25,63 +32,164 @@ interface ComingSoonSplashProps {
 export default function ComingSoonSplash({ onEnterApp, onNavigateToView }: ComingSoonSplashProps) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'seeker' | 'partner'>('seeker');
+  const [name, setName] = useState('');
+  const [province, setProvince] = useState('Gauteng');
+  const [ageRange, setAgeRange] = useState('25-29 (Developing Youth)');
+  const [race, setRace] = useState('Black African');
+  const [nationality, setNationality] = useState('South African Citizen');
+  const [consent, setConsent] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
-  const [count, setCount] = useState(1482); // Simulated starting subscribers count
+  const [count, setCount] = useState(1482); // Simulated base + live count
   const [copiedDomain, setCopiedDomain] = useState<string | null>(null);
+
+  // Secure Database and Referral States
+  const [userReferralCode, setUserReferralCode] = useState(() => localStorage.getItem('my_referral_code') || '');
+  const [referredByInput, setReferredByInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [dbRegistrants, setDbRegistrants] = useState<PreRegistrant[]>([]);
+
+  // Viral Referral & Gamification State
+  const [referralsCount, setReferralsCount] = useState<number>(() => {
+    return Number(localStorage.getItem('teaser_referrals_count') || '0');
+  });
+  const [referralEmail, setReferralEmail] = useState('');
+  const [referralSuccess, setReferralSuccess] = useState(false);
+  const [copiedReferralLink, setCopiedReferralLink] = useState(false);
+  const [subscriberQueueRank, setSubscriberQueueRank] = useState<number>(1483);
 
   // Countdown calculations
   const [timeLeft, setTimeLeft] = useState({
-    days: 45,
-    hours: 12,
-    minutes: 30,
-    seconds: 45
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0
   });
 
-  useEffect(() => {
-    // Ticking countdown
-    const timer = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev.seconds > 0) {
-          return { ...prev, seconds: prev.seconds - 1 };
-        } else if (prev.minutes > 0) {
-          return { ...prev, minutes: prev.minutes - 1, seconds: 59 };
-        } else if (prev.hours > 0) {
-          return { ...prev, hours: prev.hours - 1, minutes: 59, seconds: 59 };
-        } else if (prev.days > 0) {
-          return { days: prev.days - 1, hours: 23, minutes: 59, seconds: 59 };
+  // Load real-time database stats and list of registrants
+  const loadStats = async () => {
+    try {
+      const stats = await getTeaserStats();
+      setDbRegistrants(stats.list);
+      // Add the live database count to the base of 1482
+      setCount(1482 + stats.totalCount);
+      
+      // Update logged-in user's referral info if they exist in DB
+      const myEmail = localStorage.getItem('candidate_email');
+      if (myEmail) {
+        const found = stats.list.find(u => u.email === myEmail.toLowerCase().trim());
+        if (found) {
+          setUserReferralCode(found.referralCode);
+          setReferralsCount(found.referralsCount || 0);
+          localStorage.setItem('my_referral_code', found.referralCode);
+          localStorage.setItem('teaser_referrals_count', String(found.referralsCount || 0));
         }
-        return prev;
-      });
-    }, 1000);
+      }
+    } catch (err) {
+      console.error("Error loading stats from Firebase: ", err);
+    }
+  };
+
+  useEffect(() => {
+    // 1st October 2026 (using standard ISO string but computing difference locally)
+    const targetDate = new Date('2026-10-01T00:00:00').getTime();
+
+    const updateCountdown = () => {
+      const now = new Date().getTime();
+      const difference = targetDate - now;
+
+      if (difference <= 0) {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+        return;
+      }
+
+      const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((difference % (1000 * 60)) / 1000);
+
+      setTimeLeft({ days, hours, minutes, seconds });
+    };
+
+    updateCountdown();
+    const timer = setInterval(updateCountdown, 1000);
+
+    // Initial fetch of Firestore stats
+    loadStats();
 
     return () => clearInterval(timer);
   }, []);
 
-  const handleSubscribe = (e: React.FormEvent) => {
+  const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) return;
-
-    // Save to local storage list
-    try {
-      const existing = localStorage.getItem('pre_registrants');
-      const list = existing ? JSON.parse(existing) : [];
-      list.push({
-        email,
-        role,
-        timestamp: new Date().toISOString()
-      });
-      localStorage.setItem('pre_registrants', JSON.stringify(list));
-    } catch (err) {
-      console.error(err);
+    if (!email || !consent) {
+      alert("Please check the consent box to submit your registration.");
+      return;
     }
 
-    setSubscribed(true);
-    setCount(prev => prev + 1);
-    setEmail('');
+    setIsLoading(true);
+    try {
+      // Register in secure Firebase Firestore!
+      const registered = await registerPreRegistrant({
+        email,
+        role,
+        name: name.trim(),
+        province,
+        ageRange: role === 'seeker' ? ageRange : undefined,
+        race: role === 'seeker' ? race : undefined,
+        nationality: role === 'seeker' ? nationality : undefined,
+        timestamp: new Date().toISOString()
+      }, referredByInput.trim() || undefined);
 
-    setTimeout(() => {
-      setSubscribed(false);
-    }, 4000);
+      setUserReferralCode(registered.referralCode);
+      setReferralsCount(registered.referralsCount || 0);
+      
+      localStorage.setItem('my_referral_code', registered.referralCode);
+      localStorage.setItem('candidate_email', email.toLowerCase().trim());
+      localStorage.setItem('teaser_referrals_count', String(registered.referralsCount || 0));
+      
+      // Also save name in candidate_name to instantly personalize greeting!
+      if (role === 'seeker' && name.trim()) {
+        localStorage.setItem('candidate_name', name.trim());
+      }
+      
+      setSubscribed(true);
+      await loadStats(); // refresh database counts and list
+    } catch (err) {
+      console.error(err);
+      alert("Registration failed. Please try again. The service is securely protected.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const currentQueueRank = useMemo(() => {
+    return Math.max(12, 1483 - (referralsCount * 125));
+  }, [referralsCount]);
+
+  const handleSimulateReferral = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!referralEmail.trim() || !referralEmail.includes('@')) {
+      alert("Please enter a valid email address.");
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      const codeToUse = userReferralCode || `LW-SA-TEMP-${count}`;
+      const success = await simulateFriendReferral(codeToUse, referralEmail);
+      if (success) {
+        setReferralSuccess(true);
+        setReferralEmail('');
+        setTimeout(() => setReferralSuccess(false), 3000);
+        await loadStats(); // refresh counts and user stats!
+      } else {
+        alert("This email is already registered.");
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const copyToClipboard = (text: string, label: string) => {
@@ -110,13 +218,13 @@ export default function ComingSoonSplash({ onEnterApp, onNavigateToView }: Comin
           </div>
         </div>
 
-        {/* Demo Link Selector for Partners */}
+        {/* Live Platform Link Selector */}
         <div className="flex items-center gap-3" id="coming-soon-top-actions">
           <button 
             onClick={onEnterApp}
-            className="group/btn bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl px-4 py-2.5 text-xs font-bold text-indigo-300 hover:text-white transition-all flex items-center gap-1.5 shadow-sm"
+            className="group/btn bg-indigo-600/15 hover:bg-indigo-600/35 border border-indigo-500/45 rounded-xl px-4 py-2.5 text-xs font-bold text-indigo-200 hover:text-white transition-all flex items-center gap-1.5 shadow-md hover:shadow-indigo-500/10"
           >
-            <span>Enter Demo Preview</span>
+            <span>Explore Platform</span>
             <ArrowUpRight className="w-3.5 h-3.5 group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5 transition-transform text-indigo-400" />
           </button>
         </div>
@@ -133,7 +241,7 @@ export default function ComingSoonSplash({ onEnterApp, onNavigateToView }: Comin
           className="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border border-indigo-500/30 px-4 py-2 rounded-full text-xs font-extrabold text-indigo-300 uppercase tracking-wider mb-8 shadow-sm"
           id="teaser-tag"
         >
-          <Sparkles className="w-4 h-4 text-purple-400 animate-pulse" /> Launching September 2026
+          <Sparkles className="w-4 h-4 text-purple-400 animate-pulse" /> Launching 1st October 2026
         </motion.div>
 
         {/* Main Title */}
@@ -206,7 +314,7 @@ export default function ComingSoonSplash({ onEnterApp, onNavigateToView }: Comin
                 <div className="grid grid-cols-2 gap-2 p-1 bg-slate-950/80 rounded-xl border border-white/10" id="role-selector">
                   <button
                     type="button"
-                    onClick={() => setRole('seeker')}
+                    onClick={() => { setRole('seeker'); setName(''); }}
                     className={`py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
                       role === 'seeker'
                         ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-sm'
@@ -217,7 +325,7 @@ export default function ComingSoonSplash({ onEnterApp, onNavigateToView }: Comin
                   </button>
                   <button
                     type="button"
-                    onClick={() => setRole('partner')}
+                    onClick={() => { setRole('partner'); setName(''); }}
                     className={`py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
                       role === 'partner'
                         ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-sm'
@@ -228,51 +336,313 @@ export default function ComingSoonSplash({ onEnterApp, onNavigateToView }: Comin
                   </button>
                 </div>
 
-                {/* Email inputs */}
-                <div className="relative" id="email-input-wrapper">
-                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Mail className="w-4 h-4" />
-                  </span>
+                {/* Name Input */}
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    {role === 'seeker' ? 'Full Name' : 'Company / Institution Name'}
+                  </label>
                   <input
-                    type="email"
+                    type="text"
                     required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder={role === 'seeker' ? 'Enter your personal email...' : 'Enter your corporate work email...'}
-                    className="w-full bg-slate-950/60 border border-white/10 rounded-xl pl-10 pr-4 py-3.5 text-xs text-white placeholder-slate-500 outline-none focus:border-indigo-500 font-semibold"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder={role === 'seeker' ? 'Enter your first and last name...' : 'Enter your organization name...'}
+                    className="w-full bg-slate-950/60 border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 outline-none focus:border-indigo-500 font-semibold"
                   />
+                </div>
+
+                {/* Email inputs */}
+                <div className="space-y-1" id="email-input-wrapper">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Email Address
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                      <Mail className="w-4 h-4" />
+                    </span>
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder={role === 'seeker' ? 'Enter your personal email...' : 'Enter your corporate work email...'}
+                      className="w-full bg-slate-950/60 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-xs text-white placeholder-slate-500 outline-none focus:border-indigo-500 font-semibold"
+                    />
+                  </div>
+                </div>
+
+                {/* Province Selector */}
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Province / Region
+                  </label>
+                  <select
+                    value={province}
+                    onChange={(e) => setProvince(e.target.value)}
+                    className="w-full bg-slate-950/60 border border-white/10 rounded-xl px-4 py-3 text-xs text-slate-200 outline-none focus:border-indigo-500 font-semibold cursor-pointer"
+                  >
+                    <option value="Gauteng" className="bg-slate-950 text-white">Gauteng</option>
+                    <option value="Western Cape" className="bg-slate-950 text-white">Western Cape</option>
+                    <option value="KwaZulu-Natal" className="bg-slate-950 text-white">KwaZulu-Natal</option>
+                    <option value="Eastern Cape" className="bg-slate-950 text-white">Eastern Cape</option>
+                    <option value="Free State" className="bg-slate-950 text-white">Free State</option>
+                    <option value="Limpopo" className="bg-slate-950 text-white">Limpopo</option>
+                    <option value="Mpumalanga" className="bg-slate-950 text-white">Mpumalanga</option>
+                    <option value="Northern Cape" className="bg-slate-950 text-white">Northern Cape</option>
+                    <option value="North West" className="bg-slate-950 text-white">North West</option>
+                  </select>
+                </div>
+
+                {/* Demographic Form Fields (Visible for Job Seeker / Youth only) */}
+                {role === 'seeker' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" id="demographic-grid">
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        Age Range
+                      </label>
+                      <select
+                        value={ageRange}
+                        onChange={(e) => setAgeRange(e.target.value)}
+                        className="w-full bg-slate-950/60 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-slate-200 outline-none focus:border-indigo-500 font-semibold cursor-pointer"
+                      >
+                        <option value="18-24 (Early Youth)" className="bg-slate-950 text-white">18-24 (Early Youth)</option>
+                        <option value="25-29 (Developing Youth)" className="bg-slate-950 text-white">25-29 (Developing Youth)</option>
+                        <option value="30-35 (Senior Youth)" className="bg-slate-950 text-white">30-35 (Senior Youth)</option>
+                        <option value="36-40 (Adult)" className="bg-slate-950 text-white">36-40 (Adult)</option>
+                        <option value="41+ (Senior)" className="bg-slate-950 text-white">41+ (Senior)</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        Race / Ethnicity
+                      </label>
+                      <select
+                        value={race}
+                        onChange={(e) => setRace(e.target.value)}
+                        className="w-full bg-slate-950/60 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-slate-200 outline-none focus:border-indigo-500 font-semibold cursor-pointer"
+                      >
+                        <option value="Black African" className="bg-slate-950 text-white">Black African</option>
+                        <option value="Coloured" className="bg-slate-950 text-white">Coloured</option>
+                        <option value="Indian / Asian" className="bg-slate-950 text-white">Indian / Asian</option>
+                        <option value="White" className="bg-slate-950 text-white">White</option>
+                        <option value="Other / Prefer not to say" className="bg-slate-950 text-white">Other / Prefer not to say</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1 sm:col-span-2">
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        Nationality
+                      </label>
+                      <select
+                        value={nationality}
+                        onChange={(e) => setNationality(e.target.value)}
+                        className="w-full bg-slate-950/60 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-slate-200 outline-none focus:border-indigo-500 font-semibold cursor-pointer"
+                      >
+                        <option value="South African Citizen" className="bg-slate-950 text-white">South African Citizen</option>
+                        <option value="Permanent Resident" className="bg-slate-950 text-white">Permanent Resident</option>
+                        <option value="Foreign National" className="bg-slate-950 text-white">Foreign National</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {/* Secure Referral Link Entry Field */}
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                    <span>Have a Referral Code? (Optional)</span>
+                    <span className="text-[9px] text-indigo-400 font-black tracking-widest font-mono">Booster</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={referredByInput}
+                    onChange={(e) => setReferredByInput(e.target.value)}
+                    placeholder="e.g. LW-SA-NAME-1234"
+                    className="w-full bg-slate-950/60 border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-600 outline-none focus:border-indigo-500 font-mono uppercase font-semibold"
+                  />
+                </div>
+
+                {/* Consent Checkbox */}
+                <div className="pt-1 flex items-start gap-2.5">
+                  <input
+                    type="checkbox"
+                    id="consent-checkbox"
+                    required
+                    checked={consent}
+                    onChange={(e) => setConsent(e.target.checked)}
+                    className="mt-0.5 rounded border-white/10 bg-slate-950 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-slate-950 cursor-pointer"
+                  />
+                  <label htmlFor="consent-checkbox" className="text-[10px] text-slate-400 leading-snug select-none cursor-pointer">
+                    I explicitly consent to Careers Avalanche storing my details to contact me about digital career opportunities, testing panels, and integration updates.
+                  </label>
+                </div>
+
+                {/* Direct Mail Prompt */}
+                <div className="p-3 bg-indigo-500/5 rounded-xl border border-indigo-500/10 text-center text-[10px] text-slate-300">
+                  Are you a seeker with direct questions? Reach out to our team at <a href="mailto:talent@careersavalanche.co.za" className="text-indigo-300 font-bold hover:underline">talent@careersavalanche.co.za</a>
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full bg-gradient-to-r from-indigo-500 to-purple-500 hover:brightness-110 text-white font-extrabold text-xs px-6 py-3.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-2"
+                  disabled={isLoading}
+                  className="w-full bg-gradient-to-r from-indigo-500 to-purple-500 hover:brightness-110 text-white font-extrabold text-xs px-6 py-3.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                 >
-                  {role === 'seeker' ? 'Pre-Register as Candidate' : 'Request Corporate Integration'} <Send className="w-3.5 h-3.5" />
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Securing Registration...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>{role === 'seeker' ? 'Pre-Register as Candidate' : 'Request Corporate Integration'}</span>
+                      <Send className="w-3.5 h-3.5" />
+                    </>
+                  )}
                 </button>
 
                 <p className="text-center text-[10px] text-slate-400">
                   Join <span className="text-indigo-300 font-bold">{count}</span> South Africans already on the launch standby list.
                 </p>
+
+                {/* Real-time Registration Feed */}
+                {dbRegistrants.length > 0 && (
+                  <div className="mt-4 pt-3 border-t border-white/5 space-y-1.5 text-left" id="live-registration-feed">
+                    <span className="text-[9px] text-emerald-400 font-extrabold uppercase tracking-widest flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span> Live Cloud Registry
+                    </span>
+                    <div className="space-y-1 text-[10px] text-slate-400">
+                      {dbRegistrants.slice(0, 3).map((reg) => (
+                        <div key={reg.id || reg.email} className="flex justify-between items-center bg-slate-950/40 px-2.5 py-1.5 rounded-lg border border-white/5">
+                          <span className="font-semibold text-slate-300">{reg.name} ({reg.role === 'seeker' ? 'Candidate' : 'Partner'})</span>
+                          <span className="text-[9px] font-mono text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/10">{reg.province || 'RSA'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </form>
             ) : (
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="py-6 text-center space-y-4"
-                id="pre-reg-success"
+                className="py-2 text-center space-y-5"
+                id="pre-reg-success-dashboard"
               >
-                <div className="w-12 h-12 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-full flex items-center justify-center mx-auto">
-                  <CheckCircle2 className="w-6.5 h-6.5" />
+                <div className="w-12 h-12 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-full flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/10">
+                  <CheckCircle2 className="w-7 h-7" />
                 </div>
+                
                 <div className="space-y-1">
-                  <h4 className="font-extrabold text-white text-base">You're On the Standby List!</h4>
+                  <h4 className="font-extrabold text-white text-lg tracking-tight">You are Officially Registered!</h4>
                   <p className="text-xs text-slate-300 max-w-sm mx-auto">
-                    Thank you for joining the Careers Avalanche pre-launch list. We have reserved your queue position and will send updates as we approach active launch day.
+                    We have secured your priority queue position for the August 1st and October 1st launch sequences.
                   </p>
                 </div>
-                <div className="bg-slate-950/40 p-2.5 rounded-xl border border-white/5 inline-block text-[10px] text-indigo-300 font-bold">
-                  Queue Registration Code: LW-SA-{count}
+
+                {/* Queue Stats Widget */}
+                <div className="grid grid-cols-2 gap-3 p-4 bg-slate-950/80 rounded-2xl border border-white/10" id="queue-stats-widget">
+                  <div className="text-center space-y-1">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block">Current Rank</span>
+                    <span className="text-xl font-black text-indigo-300 block font-mono">#{currentQueueRank}</span>
+                    <span className="text-[9px] text-emerald-400 font-bold flex items-center justify-center gap-1">
+                      {referralsCount > 0 ? `▲ Moved up ${referralsCount * 125} spots` : 'Active Seeker'}
+                    </span>
+                  </div>
+                  <div className="text-center space-y-1 border-l border-white/10">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block">Verified Referrals</span>
+                    <span className="text-xl font-black text-purple-300 block font-mono">{referralsCount}</span>
+                    <span className="text-[9px] text-slate-400 font-semibold block">Invite friends to boost rank</span>
+                  </div>
+                </div>
+
+                {/* Sharing Platform Actions */}
+                <div className="space-y-2">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block text-left pl-1">Share Referral Link</span>
+                  <div className="grid grid-cols-2 gap-2" id="referral-share-actions">
+                    <button
+                      onClick={() => {
+                        copyToClipboard(`https://careersavalanche.co.za/join?ref=${userReferralCode || 'LW-SA-GLOBAL'}`, 'REFERRAL');
+                        setCopiedReferralLink(true);
+                        setTimeout(() => setCopiedReferralLink(false), 2000);
+                      }}
+                      className="py-2.5 px-3 bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer text-slate-200"
+                    >
+                      {copiedReferralLink ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Copy Link</span>
+                        </>
+                      )}
+                    </button>
+                    <a
+                      href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`Hey! I just pre-registered for South Africa's Careers Avalanche digital aptitude panel by LearnWinGrow Africa. Secure your priority spot too using my referral link: https://careersavalanche.co.za/join?ref=${userReferralCode || 'LW-SA-GLOBAL'} at www.careersavalanche.co.za`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="py-2.5 px-3 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" />
+                      <span>WhatsApp</span>
+                    </a>
+                  </div>
+                </div>
+
+                {/* Instant Referral Simulator Tool */}
+                <div className="p-4 bg-indigo-500/5 rounded-2xl border border-indigo-500/10 text-left space-y-2.5" id="referral-simulator-box">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-indigo-300 font-extrabold uppercase tracking-wider flex items-center gap-1">
+                      <Users className="w-3.5 h-3.5" /> Simulate Friend Referral
+                    </span>
+                    <span className="text-[9px] bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 px-1.5 py-0.5 rounded font-extrabold uppercase">Queue Booster</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 leading-snug">
+                    Test the viral loop! Submit a mockup friend email address to simulate them signing up with your link. This will instantly increase your referrals and skip you ahead in line!
+                  </p>
+                  
+                  <form onSubmit={handleSimulateReferral} className="flex gap-2" id="sim-referral-form">
+                    <input
+                      type="email"
+                      required
+                      value={referralEmail}
+                      onChange={(e) => setReferralEmail(e.target.value)}
+                      placeholder="friend@email.co.za"
+                      className="flex-grow bg-slate-950/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 outline-none focus:border-indigo-500 font-semibold"
+                    />
+                    <button
+                      type="submit"
+                      disabled={isLoading}
+                      className="bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-xs px-3.5 rounded-xl transition-colors shrink-0 flex items-center justify-center cursor-pointer disabled:opacity-50"
+                    >
+                      {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : "Invite"}
+                    </button>
+                  </form>
+                  <AnimatePresence>
+                    {referralSuccess && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 5 }}
+                        className="text-[10px] text-emerald-400 font-bold flex items-center gap-1.5 pt-0.5"
+                      >
+                        <Check className="w-3.5 h-3.5" /> Referral registered successfully! Queue rank boosted!
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-2.5 border-t border-white/5 text-[10px] text-slate-400">
+                  <span>Registration Code: <strong className="font-mono text-indigo-300">{userReferralCode || `LW-SA-${count}`}</strong></span>
+                  <button
+                    onClick={() => setSubscribed(false)}
+                    className="text-slate-400 hover:text-white font-bold underline cursor-pointer"
+                  >
+                    ← Register Another Account
+                  </button>
                 </div>
               </motion.div>
             )}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Award, BookOpen, Calendar, Clock, ArrowRight, Download, HelpCircle, CheckCircle2, ChevronRight, Sparkles, UserCheck } from 'lucide-react';
 import { AppView } from '../types';
@@ -17,6 +17,89 @@ interface TalentDashboardProps {
 }
 
 export default function TalentDashboard({ onNavigate, userScore, testCompleted, subScores }: TalentDashboardProps) {
+  const [candidateName, setCandidateName] = useState(() => {
+    const saved = localStorage.getItem('candidate_name');
+    if (saved && saved !== 'Sibongile') return saved;
+    try {
+      const data = localStorage.getItem('pre_registrants');
+      if (data) {
+        const list = JSON.parse(data);
+        const lastSeeker = [...list].reverse().find((r: any) => r.role === 'seeker');
+        if (lastSeeker && lastSeeker.name) {
+          return lastSeeker.name;
+        }
+      }
+    } catch (e) {}
+    return 'Guest Candidate';
+  });
+
+  const [province, setProvince] = useState(() => {
+    return localStorage.getItem('candidate_province') || 'Gauteng';
+  });
+  const [ageRange, setAgeRange] = useState(() => {
+    return localStorage.getItem('candidate_age_range') || '25-29 (Developing Youth)';
+  });
+  const [race, setRace] = useState(() => {
+    return localStorage.getItem('candidate_race') || 'Black African';
+  });
+  const [nationality, setNationality] = useState(() => {
+    return localStorage.getItem('candidate_nationality') || 'South African Citizen';
+  });
+  const [showProfileModal, setShowProfileModal] = useState(false);
+
+  const handleSaveProfile = (newName: string, newProvince: string, newAgeRange: string, newRace: string, newNationality: string) => {
+    setCandidateName(newName);
+    setProvince(newProvince);
+    setAgeRange(newAgeRange);
+    setRace(newRace);
+    setNationality(newNationality);
+
+    localStorage.setItem('candidate_name', newName);
+    localStorage.setItem('candidate_province', newProvince);
+    localStorage.setItem('candidate_age_range', newAgeRange);
+    localStorage.setItem('candidate_race', newRace);
+    localStorage.setItem('candidate_nationality', newNationality);
+
+    // Save/update this candidate in pre_registrants so the admin statistics immediately update!
+    try {
+      const existing = localStorage.getItem('pre_registrants');
+      const list = existing ? JSON.parse(existing) : [];
+      
+      const email = localStorage.getItem('candidate_email') || `talent.seeker@careersavalanche.co.za`;
+      const itemIndex = list.findIndex((r: any) => r.email === email || (r.role === 'seeker' && r.name === candidateName));
+      
+      const updatedEntry = {
+        email,
+        role: 'seeker' as const,
+        name: newName,
+        province: newProvince,
+        ageRange: newAgeRange,
+        race: newRace,
+        nationality: newNationality,
+        timestamp: new Date().toISOString()
+      };
+
+      if (itemIndex > -1) {
+        list[itemIndex] = updatedEntry;
+      } else {
+        list.push(updatedEntry);
+      }
+      localStorage.setItem('pre_registrants', JSON.stringify(list));
+    } catch (err) {
+      console.error(err);
+    }
+    
+    setShowProfileModal(false);
+  };
+
+  const getInitials = (name: string) => {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  };
+
   // Compute overall match percent or display state
   const displayScore = testCompleted ? userScore : 75;
   const displayLogical = testCompleted ? subScores.logical : 84;
@@ -55,11 +138,21 @@ export default function TalentDashboard({ onNavigate, userScore, testCompleted, 
 
           <div className="flex items-center gap-4" id="dashboard-user-nav">
             <div className="text-right hidden sm:block">
-              <span className="block font-bold text-white text-sm">Jabari</span>
+              <span 
+                onClick={() => setShowProfileModal(true)}
+                className="block font-bold text-white text-sm hover:text-indigo-300 cursor-pointer transition-colors flex items-center gap-1 justify-end"
+                title="Update your candidate profile"
+              >
+                {candidateName} <span className="text-[10px] opacity-65">✏️</span>
+              </span>
               <span className="block text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Candidate</span>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white font-extrabold shadow-lg shadow-indigo-500/10">
-              JB
+            <div 
+              onClick={() => setShowProfileModal(true)}
+              className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white font-extrabold shadow-lg shadow-indigo-500/10 cursor-pointer hover:brightness-110 transition-all"
+              title="Update your candidate profile"
+            >
+              {getInitials(candidateName)}
             </div>
           </div>
         </div>
@@ -79,8 +172,15 @@ export default function TalentDashboard({ onNavigate, userScore, testCompleted, 
                 <div className="inline-flex items-center gap-1.5 bg-indigo-500/20 border border-indigo-400/25 text-indigo-300 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider">
                   <Sparkles className="w-3.5 h-3.5 text-amber-400 fill-amber-400" /> Member Account Active
                 </div>
-                <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
-                  Welcome back, Jabari.
+                <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span>Welcome back, {candidateName}.</span>
+                  <button 
+                    onClick={() => setShowProfileModal(true)}
+                    className="text-xs bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg px-2 py-1 text-indigo-300 font-bold transition-all inline-flex items-center gap-1 cursor-pointer"
+                    title="Change your candidate profile details"
+                  >
+                    ✏️ Edit Profile
+                  </button>
                 </h1>
                 <p className="text-slate-300 text-sm leading-relaxed">
                   {testCompleted 
@@ -290,7 +390,7 @@ export default function TalentDashboard({ onNavigate, userScore, testCompleted, 
 
                 <a 
                   href="#" 
-                  onClick={(e) => { e.preventDefault(); alert("Preparing Quarterly Talent PDF report for Jabari. Ready for download."); }}
+                  onClick={(e) => { e.preventDefault(); alert(`Preparing Quarterly Talent PDF report for ${candidateName}. Ready for download.`); }}
                   className="w-full flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-left transition-colors text-xs font-semibold text-slate-200 hover:text-white"
                 >
                   <span className="flex items-center gap-1.5"><Download className="w-3.5 h-3.5 text-indigo-300" /> Download Quarterly Report</span>
@@ -357,7 +457,7 @@ export default function TalentDashboard({ onNavigate, userScore, testCompleted, 
                   <span>Tomorrow, 14:00 - 15:00 UTC</span>
                 </div>
                 <button 
-                  onClick={() => alert("Registration confirmed! Access link has been emailed to Jabari.")}
+                  onClick={() => alert(`Registration confirmed! Access link has been emailed to ${candidateName}.`)}
                   className="w-full bg-gradient-to-r from-indigo-500 to-purple-500 hover:brightness-110 text-white text-xs font-bold py-3 rounded-xl transition-all block text-center"
                 >
                   Reserve My Seat
@@ -395,6 +495,127 @@ export default function TalentDashboard({ onNavigate, userScore, testCompleted, 
         </section>
 
       </main>
+      
+      {/* Profile demographic updating modal */}
+      {showProfileModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md" id="profile-modal">
+          <motion.div 
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="w-full max-w-md bg-slate-900 border border-white/10 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl relative text-left"
+            id="profile-modal-content"
+          >
+            <div className="space-y-1">
+              <h3 className="text-xl font-black text-white">Your Candidate Profile</h3>
+              <p className="text-xs text-slate-400">Specify your details below to align your profile with South Africa's live demographic filters and target career matching.</p>
+            </div>
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const target = e.target as any;
+              handleSaveProfile(
+                target.nameInput.value,
+                target.provinceInput.value,
+                target.ageInput.value,
+                target.raceInput.value,
+                target.nationalityInput.value
+              );
+            }} className="space-y-4">
+              <div className="space-y-1">
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Full Name</label>
+                <input 
+                  name="nameInput"
+                  type="text"
+                  required
+                  defaultValue={candidateName === 'Guest Candidate' ? '' : candidateName}
+                  placeholder="e.g. Sindi Ndlovu"
+                  className="w-full bg-slate-950/60 border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 outline-none focus:border-indigo-500 font-semibold"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Province / Region</label>
+                <select 
+                  name="provinceInput"
+                  defaultValue={province}
+                  className="w-full bg-slate-950/60 border border-white/10 rounded-xl px-4 py-3 text-xs text-slate-200 outline-none focus:border-indigo-500 font-semibold cursor-pointer"
+                >
+                  <option value="Gauteng">Gauteng</option>
+                  <option value="Western Cape">Western Cape</option>
+                  <option value="KwaZulu-Natal">KwaZulu-Natal</option>
+                  <option value="Eastern Cape">Eastern Cape</option>
+                  <option value="Free State">Free State</option>
+                  <option value="Limpopo">Limpopo</option>
+                  <option value="Mpumalanga">Mpumalanga</option>
+                  <option value="Northern Cape">Northern Cape</option>
+                  <option value="North West">North West</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Age Range</label>
+                  <select 
+                    name="ageInput"
+                    defaultValue={ageRange}
+                    className="w-full bg-slate-950/60 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-slate-200 outline-none focus:border-indigo-500 font-semibold cursor-pointer"
+                  >
+                    <option value="18-24 (Early Youth)">18-24 (Early Youth)</option>
+                    <option value="25-29 (Developing Youth)">25-29 (Developing Youth)</option>
+                    <option value="30-35 (Senior Youth)">30-35 (Senior Youth)</option>
+                    <option value="36-40 (Adult)">36-40 (Adult)</option>
+                    <option value="41+ (Senior)">41+ (Senior)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Race</label>
+                  <select 
+                    name="raceInput"
+                    defaultValue={race}
+                    className="w-full bg-slate-950/60 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-slate-200 outline-none focus:border-indigo-500 font-semibold cursor-pointer"
+                  >
+                    <option value="Black African">Black African</option>
+                    <option value="Coloured">Coloured</option>
+                    <option value="Indian / Asian">Indian / Asian</option>
+                    <option value="White">White</option>
+                    <option value="Other / Prefer not to say">Other / Prefer not to say</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nationality</label>
+                <select 
+                  name="nationalityInput"
+                  defaultValue={nationality}
+                  className="w-full bg-slate-950/60 border border-white/10 rounded-xl px-4 py-3 text-xs text-slate-200 outline-none focus:border-indigo-500 font-semibold cursor-pointer"
+                >
+                  <option value="South African Citizen">South African Citizen</option>
+                  <option value="Permanent Resident">Permanent Resident</option>
+                  <option value="Foreign National">Foreign National</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4">
+                <button 
+                  type="button"
+                  onClick={() => setShowProfileModal(false)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  className="bg-gradient-to-r from-indigo-500 to-purple-500 hover:brightness-110 text-white text-xs font-bold px-5 py-2.5 rounded-xl transition-all shadow-md"
+                >
+                  Save Profile Details
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
 
       {/* Footer */}
       <Footer onNavigate={onNavigate} />

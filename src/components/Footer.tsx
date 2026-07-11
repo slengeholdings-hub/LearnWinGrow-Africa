@@ -119,11 +119,19 @@ export default function Footer({ onNavigate }: FooterProps) {
                   2157, South Africa
                 </span>
               </div>
-              <div className="flex items-center gap-2">
-                <Mail className="w-4 h-4 text-emerald-400 shrink-0" />
-                <a href="mailto:info@learnwingrow.africa" className="hover:text-white hover:underline">
-                  info@learnwingrow.africa
-                </a>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <a href="mailto:info@learnwingrow.africa" className="hover:text-white hover:underline">
+                    info@learnwingrow.africa
+                  </a>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-indigo-400 shrink-0" />
+                  <a href="mailto:talent@careersavalanche.co.za" className="hover:text-white hover:underline text-indigo-300 font-bold">
+                    talent@careersavalanche.co.za
+                  </a>
+                </div>
               </div>
 
               {/* Social Media Row */}
@@ -146,11 +154,11 @@ export default function Footer({ onNavigate }: FooterProps) {
 
                   {/* Facebook */}
                   <a 
-                    href="https://facebook.com/learnwingrow" 
+                    href="https://www.facebook.com/Careersavalanche" 
                     target="_blank" 
                     rel="noopener noreferrer" 
                     className="p-2 bg-blue-600/10 hover:bg-blue-600/20 text-[#3b82f6] hover:text-white rounded-xl border border-blue-500/20 hover:scale-105 transition-all"
-                    title="Facebook Page"
+                    title="Careersavalanche Facebook Page"
                   >
                     <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
                       <path d="M22 12c0-5.52-4.48-10-10-10S2 6.48 2 12c0 4.84 3.44 8.87 8 9.8V15H8v-3h2V9.5C10 7.57 11.57 6 13.5 6H16v3h-2c-.55 0-1 .45-1 1v2h3v3h-3v6.95c5.05-.5 9-4.76 9-9.95z" />

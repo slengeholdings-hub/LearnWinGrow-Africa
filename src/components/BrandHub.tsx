@@ -19,13 +19,37 @@ export default function BrandHub({ onNavigate }: BrandHubProps) {
   const [activeVideoUrl, setActiveVideoUrl] = useState<string | null>(null);
   const [activeVideoTitle, setActiveVideoTitle] = useState<string>('');
 
+  // Partner onboarding state variables
+  const [showOnboardingForm, setShowOnboardingForm] = useState(false);
+  const [onboardingName, setOnboardingName] = useState('');
+  const [onboardingEmail, setOnboardingEmail] = useState('');
+  const [onboardingSector, setOnboardingSector] = useState('Tech');
+  const [onboardingLocation, setOnboardingLocation] = useState('Gauteng');
+  const [onboardingStatus, setOnboardingStatus] = useState('Actively Hiring');
+  const [onboardingDesc, setOnboardingDesc] = useState('');
+  const [onboardingConsent, setOnboardingConsent] = useState(false);
+  const [onboardingSuccess, setOnboardingSuccess] = useState(false);
+
+  // Dynamic registered companies loading from localStorage
+  const [dynamicCompanies, setDynamicCompanies] = useState<Company[]>(() => {
+    try {
+      const stored = localStorage.getItem('registered_partners');
+      if (stored) {
+        return [...initialCompanies, ...JSON.parse(stored)];
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return initialCompanies;
+  });
+
   const sectors = ['All', 'Fintech', 'Tech', 'Agriculture', 'Renewable Energy', 'Creative Economy'];
-  const locations = ['All', 'Gauteng', 'Western Cape', 'KwaZulu-Natal'];
+  const locations = ['All', 'Gauteng', 'Western Cape', 'KwaZulu-Natal', 'Eastern Cape', 'Free State', 'Limpopo', 'Mpumalanga', 'Northern Cape', 'North West'];
   const statuses = ['All', 'Actively Hiring', 'Hiring Soon'];
 
   // Filtered companies computed in real-time
   const filteredCompanies = useMemo(() => {
-    return initialCompanies.filter((company) => {
+    return dynamicCompanies.filter((company) => {
       const matchesSearch = company.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                             company.description.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesSector = selectedSector === 'All' || company.sector === selectedSector;
@@ -34,7 +58,7 @@ export default function BrandHub({ onNavigate }: BrandHubProps) {
       
       return matchesSearch && matchesSector && matchesLocation && matchesStatus;
     });
-  }, [searchTerm, selectedSector, selectedLocation, selectedStatus]);
+  }, [dynamicCompanies, searchTerm, selectedSector, selectedLocation, selectedStatus]);
 
   // Featured and regular split for layout bento
   const featuredCompanies = useMemo(() => {
@@ -75,6 +99,60 @@ export default function BrandHub({ onNavigate }: BrandHubProps) {
   const handleOpenVideo = (videoUrl: string, title: string) => {
     setActiveVideoUrl(videoUrl);
     setActiveVideoTitle(title);
+  };
+
+  const handlePartnerOnboarding = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!onboardingName || !onboardingEmail || !onboardingConsent) {
+      alert("Please complete all required fields and check the consent box.");
+      return;
+    }
+
+    // 1. Create a new Company item
+    const newCompany: Company = {
+      id: 'c-dynamic-' + Date.now(),
+      name: onboardingName,
+      description: onboardingDesc || `An innovative organization committed to building sustainable pipelines in South Africa's ${onboardingSector} industry.`,
+      matchRate: Math.floor(Math.random() * 15) + 85, // 85 to 99
+      sector: onboardingSector as any,
+      location: onboardingLocation,
+      logo: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=200", // standard generic corporate thumbnail
+      bannerImage: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=800",
+      hiringStatus: onboardingStatus as any,
+      isFeatured: Math.random() > 0.5
+    };
+
+    // 2. Save company to registered_partners
+    try {
+      const stored = localStorage.getItem('registered_partners');
+      const list = stored ? JSON.parse(stored) : [];
+      list.push(newCompany);
+      localStorage.setItem('registered_partners', JSON.stringify(list));
+      
+      // Update state so it renders in real-time
+      setDynamicCompanies([...initialCompanies, ...list]);
+    } catch (err) {
+      console.error(err);
+    }
+
+    // 3. Register as subscriber in pre_registrants so it streams to the Admin standby queue!
+    try {
+      const storedRegs = localStorage.getItem('pre_registrants');
+      const regsList = storedRegs ? JSON.parse(storedRegs) : [];
+      regsList.push({
+        email: onboardingEmail,
+        role: 'partner',
+        companyName: onboardingName,
+        province: onboardingLocation,
+        timestamp: new Date().toISOString()
+      });
+      localStorage.setItem('pre_registrants', JSON.stringify(regsList));
+    } catch (err) {
+      console.error(err);
+    }
+
+    // 4. Reset form fields and set success state
+    setOnboardingSuccess(true);
   };
 
   return (
@@ -426,6 +504,185 @@ export default function BrandHub({ onNavigate }: BrandHubProps) {
           )}
         </AnimatePresence>
 
+        {/* Dynamic Partner Onboarding Form Modal */}
+        <AnimatePresence>
+          {showOnboardingForm && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto" id="partner-onboarding-root">
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => { setShowOnboardingForm(false); setOnboardingSuccess(false); }}
+                className="fixed inset-0 bg-slate-950/90 backdrop-blur-sm"
+              ></motion.div>
+
+              <motion.div 
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="relative bg-slate-900 border border-white/10 w-full max-w-xl rounded-3xl p-6 sm:p-8 shadow-2xl z-10 max-h-[90vh] overflow-y-auto font-sans text-white space-y-6"
+                id="partner-onboarding-container"
+              >
+                {/* Header */}
+                <div className="flex justify-between items-center border-b border-white/10 pb-4">
+                  <div>
+                    <h3 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
+                      <Building className="w-5 h-5 text-indigo-400" /> List Your Company
+                    </h3>
+                    <p className="text-xs text-slate-400">Join South Africa's verified youth pipeline platform</p>
+                  </div>
+                  <button 
+                    onClick={() => { setShowOnboardingForm(false); setOnboardingSuccess(false); }}
+                    className="p-1.5 rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {!onboardingSuccess ? (
+                  <form onSubmit={handlePartnerOnboarding} className="space-y-4 text-left">
+                    {/* Company Name */}
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Company / Institution Name *</label>
+                      <input 
+                        type="text"
+                        required
+                        value={onboardingName}
+                        onChange={(e) => setOnboardingName(e.target.value)}
+                        placeholder="e.g. BlueSky Digital Ltd"
+                        className="w-full bg-slate-950/60 border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 outline-none focus:border-indigo-500 font-semibold"
+                      />
+                    </div>
+
+                    {/* Contact Email */}
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Corporate Contact Email *</label>
+                      <input 
+                        type="email"
+                        required
+                        value={onboardingEmail}
+                        onChange={(e) => setOnboardingEmail(e.target.value)}
+                        placeholder="e.g. partnership@bluesky.co.za"
+                        className="w-full bg-slate-950/60 border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 outline-none focus:border-indigo-500 font-semibold"
+                      />
+                    </div>
+
+                    {/* Sector & Region Dropdowns */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Industry Sector *</label>
+                        <select
+                          value={onboardingSector}
+                          onChange={(e) => setOnboardingSector(e.target.value)}
+                          className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-indigo-500 font-semibold cursor-pointer"
+                        >
+                          <option value="Fintech">Fintech</option>
+                          <option value="Tech">Tech</option>
+                          <option value="Agriculture">Agriculture</option>
+                          <option value="Renewable Energy">Renewable Energy</option>
+                          <option value="Creative Economy">Creative Economy</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Province / Location *</label>
+                        <select
+                          value={onboardingLocation}
+                          onChange={(e) => setOnboardingLocation(e.target.value)}
+                          className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-indigo-500 font-semibold cursor-pointer"
+                        >
+                          {locations.filter(loc => loc !== 'All').map(loc => (
+                            <option key={loc} value={loc}>{loc}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Hiring Status */}
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Hiring Status *</label>
+                      <select
+                        value={onboardingStatus}
+                        onChange={(e) => setOnboardingStatus(e.target.value)}
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-indigo-500 font-semibold cursor-pointer"
+                      >
+                        <option value="Actively Hiring">Actively Hiring</option>
+                        <option value="Hiring Soon">Hiring Soon</option>
+                      </select>
+                    </div>
+
+                    {/* Description */}
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Brief Corporate Description</label>
+                      <textarea
+                        value={onboardingDesc}
+                        onChange={(e) => setOnboardingDesc(e.target.value)}
+                        placeholder="Tell job seekers about your mission, work environment, and digital skill needs..."
+                        rows={3}
+                        className="w-full bg-slate-950/60 border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 outline-none focus:border-indigo-500 font-semibold resize-none"
+                      />
+                    </div>
+
+                    {/* Consent checkbox */}
+                    <div className="pt-2 flex items-start gap-2.5">
+                      <input 
+                        type="checkbox"
+                        id="onboarding-consent"
+                        required
+                        checked={onboardingConsent}
+                        onChange={(e) => setOnboardingConsent(e.target.checked)}
+                        className="mt-0.5 rounded border-white/10 bg-slate-950 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-slate-900 cursor-pointer"
+                      />
+                      <label htmlFor="onboarding-consent" className="text-[10px] text-slate-400 leading-snug select-none cursor-pointer">
+                        We explicitly consent to LearnWinGrow Africa listing our brand on the portal and verifying South African youth candidates for our talent pipeline.
+                      </label>
+                    </div>
+
+                    <div className="pt-4 flex gap-3">
+                      <button 
+                        type="button"
+                        onClick={() => setShowOnboardingForm(false)}
+                        className="flex-1 bg-white/5 border border-white/10 hover:bg-white/10 text-slate-300 font-bold text-xs py-3 rounded-xl transition-all"
+                      >
+                        Cancel
+                      </button>
+                      <button 
+                        type="submit"
+                        className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-500 hover:brightness-110 text-white font-extrabold text-xs py-3 rounded-xl transition-all shadow-lg shadow-indigo-500/25"
+                      >
+                        List My Company Now
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="py-8 text-center space-y-4">
+                    <div className="w-14 h-14 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                      <Compass className="w-8 h-8 animate-spin" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="font-extrabold text-white text-base">Onboarding Completed Successfully!</h4>
+                      <p className="text-xs text-slate-300 max-w-sm mx-auto leading-relaxed">
+                        Your company brand has been compiled into the **Employer Brand Hub** directory. Job seekers can now review your profile.
+                      </p>
+                      <p className="text-[11px] text-indigo-300 font-mono mt-2">
+                        Contact details verified under secure consent protocols.
+                      </p>
+                    </div>
+                    <div className="pt-4">
+                      <button 
+                        onClick={() => { setShowOnboardingForm(false); setOnboardingSuccess(false); }}
+                        className="bg-indigo-500 hover:bg-indigo-600 text-white font-extrabold text-xs px-8 py-3 rounded-xl shadow-lg transition-all"
+                      >
+                        Explore the Updated Hub
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
         {/* Call to Action Section */}
         <section className="bg-white/5 border border-white/10 backdrop-blur-xl rounded-3xl p-8 sm:p-12 relative overflow-hidden shadow-2xl shadow-indigo-500/5" id="brands-cta">
           <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl"></div>
@@ -435,7 +692,10 @@ export default function BrandHub({ onNavigate }: BrandHubProps) {
               Partner with LearnWinGrow Africa to access our certified analytical dashboards, download custom talent insights report, or setup private testing panels for your organization.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 pt-3">
-              <button onClick={() => alert("Redirecting to Company Onboarding form.")} className="bg-gradient-to-r from-indigo-500 to-purple-500 hover:brightness-110 text-white font-bold text-xs px-6 py-3.5 rounded-xl transition-all shadow-lg shadow-indigo-500/20 uppercase tracking-wider">
+              <button 
+                onClick={() => setShowOnboardingForm(true)} 
+                className="bg-gradient-to-r from-indigo-500 to-purple-500 hover:brightness-110 text-white font-bold text-xs px-6 py-3.5 rounded-xl transition-all shadow-lg shadow-indigo-500/20 uppercase tracking-wider cursor-pointer"
+              >
                 List Your Company
               </button>
               <button onClick={() => alert("Downloading Corporate Media and Integration Kit.")} className="bg-white/5 hover:bg-white/10 text-white border border-white/10 text-xs font-semibold px-6 py-3.5 rounded-xl transition-all">

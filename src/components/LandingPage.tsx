@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Compass, BookOpen, Cpu, Globe, Users, ChevronRight, Award, Flame, LogIn } from 'lucide-react';
 import { AppView } from '../types';
@@ -10,6 +10,18 @@ interface LandingPageProps {
 }
 
 export default function LandingPage({ onNavigate }: LandingPageProps) {
+  const [candidateName, setCandidateName] = useState(() => {
+    return localStorage.getItem('candidate_name') || 'Sibongile';
+  });
+
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setCandidateName(localStorage.getItem('candidate_name') || 'Sibongile');
+    };
+    window.addEventListener('storage', handleStorageChange);
+    setCandidateName(localStorage.getItem('candidate_name') || 'Sibongile');
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
   return (
     <div className="min-h-screen bg-transparent text-white font-sans selection:bg-indigo-500 selection:text-white" id="landing-page-root">
       {/* Top NavBar */}
@@ -159,7 +171,7 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
                 </div>
 
                 <div className="mt-6 pt-6 border-t border-white/10 flex items-center justify-between text-xs" id="hero-card-footer">
-                  <span className="text-slate-400">Candidate: <strong className="text-white">Jabari</strong></span>
+                  <span className="text-slate-400">Candidate: <strong className="text-white">{candidateName}</strong></span>
                   <span className="text-slate-400">Status: <strong className="text-indigo-300">Certified Ready</strong></span>
                 </div>
               </div>
@@ -312,6 +324,110 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Hybrid Magazine Promo Section */}
+      <section className="py-20 bg-slate-950/40 border-t border-white/10 relative overflow-hidden" id="landing-magazine-promo">
+        {/* Subtle decorative glows */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-500/10 blur-[100px] rounded-full pointer-events-none"></div>
+        
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="grid lg:grid-cols-12 gap-12 items-center">
+            
+            <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
+              <span className="inline-flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-widest animate-pulse">
+                ★ Hybrid Media Launch: Print + Digital
+              </span>
+              
+              <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight leading-tight">
+                Careers Avalanche <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">Hybrid Digital Magazine</span>
+              </h2>
+              
+              <p className="text-slate-300 text-sm sm:text-base leading-relaxed max-w-2xl mx-auto lg:mx-0">
+                To bridge the regional digital divide, we distribute 15,000+ printed copies of Careers Avalanche directly to community hubs, libraries, and vocational schools across South Africa. 
+                Coupled with our interactive proctored online scoreboards, this creates a state-of-the-art hybrid placement framework.
+              </p>
+
+              <div className="grid sm:grid-cols-2 gap-4 max-w-lg mx-auto lg:mx-0 text-left pt-2">
+                <div className="flex gap-3 bg-white/5 border border-white/5 p-4 rounded-xl">
+                  <div className="text-2xl font-black text-indigo-300 font-mono">15K+</div>
+                  <div>
+                    <h5 className="font-bold text-white text-xs uppercase tracking-wider">Audited Print Run</h5>
+                    <p className="text-[11px] text-slate-400">Distributed to 120+ active regional nodes.</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 bg-white/5 border border-white/5 p-4 rounded-xl">
+                  <div className="text-2xl font-black text-purple-300 font-mono">80K+</div>
+                  <div>
+                    <h5 className="font-bold text-white text-xs uppercase tracking-wider">Digital Ad Reach</h5>
+                    <p className="text-[11px] text-slate-400">Recruiters browse proctored lists.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
+                <button
+                  onClick={() => {
+                    sessionStorage.setItem('blog_tab', 'magazine');
+                    onNavigate('blog');
+                  }}
+                  className="bg-gradient-to-r from-indigo-500 to-purple-500 hover:brightness-110 text-white font-extrabold px-6 py-3 rounded-xl text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-indigo-500/15"
+                >
+                  <span>Launch Interactive Previewer</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+                
+                <a 
+                  href="https://www.facebook.com/Careersavalanche"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-slate-400 hover:text-white text-xs font-bold flex items-center gap-1 transition-colors"
+                >
+                  Visit Facebook Page (Careersavalanche) <ChevronRight className="w-3.5 h-3.5" />
+                </a>
+              </div>
+            </div>
+
+            <div className="lg:col-span-5 relative flex justify-center">
+              {/* Animated visual of a magazine 3D card stacked */}
+              <div className="relative w-72 sm:w-80 aspect-[3/4] bg-gradient-to-br from-indigo-950 to-purple-950 p-6 rounded-2xl border border-white/25 shadow-2xl flex flex-col justify-between overflow-hidden group">
+                {/* Visual Cover Accent */}
+                <div className="absolute top-[-20%] right-[-20%] w-60 h-60 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full opacity-20 blur-2xl group-hover:opacity-30 transition-all duration-500"></div>
+                
+                <div className="flex items-center justify-between border-b border-white/15 pb-3">
+                  <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2.5 py-0.5 rounded font-black tracking-wider uppercase">Q3 2026 Edition</span>
+                  <span className="text-[9px] text-slate-400 font-mono">HYBRID DUAL-CHANNEL</span>
+                </div>
+
+                <div className="my-auto space-y-3">
+                  <span className="text-[10px] text-orange-400 font-extrabold uppercase tracking-widest block">★ SPONSOR SPOTLIGHT PREVIEW</span>
+                  <h4 className="text-2xl font-black text-white leading-tight uppercase tracking-tight">
+                    Careers <br />
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">Avalanche</span>
+                  </h4>
+                  <p className="text-[11px] text-slate-300 leading-normal font-medium">
+                    "Bridging regional employment skills gaps with proctored digital benchmarks and offline print-runs."
+                  </p>
+                </div>
+
+                <div className="border-t border-white/10 pt-3 flex items-center justify-between text-[10px] text-slate-400">
+                  <span>LearnWinGrow Africa</span>
+                  <button 
+                    onClick={() => {
+                      sessionStorage.setItem('blog_tab', 'magazine');
+                      onNavigate('blog');
+                    }}
+                    className="text-indigo-400 font-bold hover:underline"
+                  >
+                    Flip Pages →
+                  </button>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       </section>
