@@ -24,6 +24,7 @@ import Footer from './Footer';
 
 interface CareersBlogProps {
   onNavigate: (view: AppView) => void;
+  isDeveloper?: boolean;
 }
 
 interface BlogPost {
@@ -40,7 +41,7 @@ interface BlogPost {
   likes: number;
 }
 
-export default function CareersBlog({ onNavigate }: CareersBlogProps) {
+export default function CareersBlog({ onNavigate, isDeveloper = false }: CareersBlogProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeArticle, setActiveArticle] = useState<BlogPost | null>(null);
@@ -231,7 +232,7 @@ export default function CareersBlog({ onNavigate }: CareersBlogProps) {
       {/* Navigation Header */}
       <header className="sticky top-0 z-40 bg-white/5 backdrop-blur-xl border-b border-white/10 text-white" id="blog-header">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => onNavigate('landing')} id="blog-logo-link">
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => onNavigate(isDeveloper ? 'landing' : 'splash')} id="blog-logo-link">
             <div className="w-10 h-10 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-indigo-500/20">
               LW
             </div>
@@ -242,26 +243,36 @@ export default function CareersBlog({ onNavigate }: CareersBlogProps) {
           </div>
 
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300" id="blog-nav-links">
-            <button onClick={() => onNavigate('landing')} className="hover:text-white transition-colors">Home</button>
-            <button onClick={() => onNavigate('dashboard')} className="hover:text-white transition-colors">Dashboard</button>
-            <button onClick={() => onNavigate('assessment')} className="hover:text-white transition-colors">Tests</button>
-            <button onClick={() => onNavigate('brands')} className="hover:text-white transition-colors">Brands</button>
+            <button onClick={() => onNavigate(isDeveloper ? 'landing' : 'splash')} className="hover:text-white transition-colors">Home</button>
+            {isDeveloper && (
+              <>
+                <button onClick={() => onNavigate('landing')} className="hover:text-white transition-colors">Workspace</button>
+                <button onClick={() => onNavigate('dashboard')} className="hover:text-white transition-colors">Dashboard</button>
+                <button onClick={() => onNavigate('assessment')} className="hover:text-white transition-colors">Tests</button>
+                <button onClick={() => onNavigate('brands')} className="hover:text-white transition-colors">Brands</button>
+              </>
+            )}
             <button onClick={() => onNavigate('blog')} className="text-indigo-300 font-semibold hover:text-indigo-200 transition-colors">Blog</button>
-            <button onClick={() => onNavigate('admin')} className="hover:text-white transition-colors">Admin Portal</button>
+            <button onClick={() => onNavigate('register')} className="hover:text-white transition-colors">Register</button>
+            {isDeveloper && (
+              <button onClick={() => onNavigate('admin')} className="hover:text-white transition-colors">Admin Portal</button>
+            )}
           </nav>
 
           <div className="flex items-center gap-3" id="blog-header-ctas">
+            {isDeveloper && (
+              <button 
+                onClick={() => setShowAddForm(!showAddForm)}
+                className="bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-white font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 transition-all"
+              >
+                <Plus className="w-4 h-4 text-indigo-400" /> Share Partner Update
+              </button>
+            )}
             <button 
-              onClick={() => setShowAddForm(!showAddForm)}
-              className="bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-white font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 transition-all"
-            >
-              <Plus className="w-4 h-4 text-indigo-400" /> Share Partner Update
-            </button>
-            <button 
-              onClick={() => onNavigate('assessment')} 
+              onClick={() => onNavigate(isDeveloper ? 'assessment' : 'register')} 
               className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-lg shadow-indigo-500/20 hover:brightness-110 transition-all"
             >
-              Take Test
+              {isDeveloper ? 'Take Test' : 'Join Waitlist'}
             </button>
           </div>
         </div>

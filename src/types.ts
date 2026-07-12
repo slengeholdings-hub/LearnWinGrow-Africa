@@ -1,4 +1,4 @@
-export type AppView = 'landing' | 'dashboard' | 'assessment' | 'brands' | 'admin' | 'blog' | 'splash';
+export type AppView = 'landing' | 'dashboard' | 'assessment' | 'brands' | 'admin' | 'blog' | 'splash' | 'register' | 'lwg-corporate';
 
 export interface Question {
   id: number;

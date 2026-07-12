@@ -1,6 +1,15 @@
 # https://www.robotstxt.org/robotstxt.html
 User-agent: *
 Allow: /
+Allow: /register
+
+# Exclude internal building-block routes from Google Search indexation
+Disallow: /landing
+Disallow: /dashboard
+Disallow: /assessment
+Disallow: /brands
+Disallow: /admin
+Disallow: /blog
 
 # Sitemap Location
 Sitemap: https://learnwingrow.africa/sitemap.xml
