@@ -33,7 +33,6 @@ export default function LwgCorporatePage({ onNavigateToView }: LwgCorporatePageP
         </div>
         
         <div className="flex items-center gap-4">
-          <span className="text-xs text-slate-400 font-medium tracking-wide">Pty Ltd Reg: 2024/559030/07</span>
         </div>
       </header>
 
@@ -58,7 +57,7 @@ export default function LwgCorporatePage({ onNavigateToView }: LwgCorporatePageP
         </div>
 
         {/* Plain Text Description Area */}
-        <div className="space-y-6 text-slate-300 text-base sm:text-lg leading-relaxed font-normal text-left" id="lwg-corporate-text-body">
+        <div className="space-y-6 text-slate-300 text-base sm:text-lg leading-relaxed font-normal text-justify" id="lwg-corporate-text-body">
           <p>
             <strong>Learn Win Grow Africa</strong> is a South African education, career development and workforce innovation company dedicated to preparing people for success in a rapidly evolving world of work. Through innovation, technology and strategic partnerships, the company develops solutions that connect education, industry and employment while equipping individuals with the knowledge, skills and opportunities needed to thrive in the digital economy.
           </p>
