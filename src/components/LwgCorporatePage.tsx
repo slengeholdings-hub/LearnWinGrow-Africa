@@ -30,15 +30,7 @@ export default function LwgCorporatePage({ onNavigateToView }: LwgCorporatePageP
         </div>
         
         <div className="flex items-center gap-4">
-          <span className="hidden sm:inline text-xs text-slate-400 font-medium tracking-wide">Pty Ltd Reg: 2024/559030/07</span>
-          <button 
-            onClick={() => onNavigateToView('splash')}
-            className="text-xs bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2.5 rounded-xl font-extrabold text-slate-300 hover:text-white transition-all flex items-center gap-1.5"
-            id="corp-nav-splash-btn"
-          >
-            <span>Platform Teaser</span>
-            <ArrowRight className="w-3.5 h-3.5 text-indigo-400" />
-          </button>
+          <span className="text-xs text-slate-400 font-medium tracking-wide">Pty Ltd Reg: 2024/559030/07</span>
         </div>
       </header>
 
@@ -80,40 +72,49 @@ export default function LwgCorporatePage({ onNavigateToView }: LwgCorporatePageP
           className="w-full max-w-2xl mt-12"
           id="corp-click-target-container"
         >
-          <button
-            onClick={() => setIsProfileOpen(true)}
-            className="w-full text-left bg-gradient-to-br from-indigo-950/40 to-slate-900/60 border border-indigo-500/30 hover:border-indigo-500/60 rounded-3xl p-6 sm:p-10 transition-all shadow-[0_15px_40px_-15px_rgba(99,102,241,0.2)] hover:shadow-[0_20px_50px_-10px_rgba(99,102,241,0.3)] duration-300 relative group overflow-hidden cursor-pointer flex flex-col justify-between"
+          <div
+            className="w-full text-left bg-gradient-to-br from-indigo-950/40 to-slate-900/60 border border-indigo-500/30 rounded-3xl p-6 sm:p-10 shadow-[0_15px_40px_-15px_rgba(99,102,241,0.2)] relative overflow-hidden"
             id="lwg-corporate-trigger-card"
           >
-            {/* Ambient light glow inside the card on hover */}
-            <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/0 via-indigo-500/0 to-indigo-500/5 group-hover:to-indigo-500/10 transition-all duration-500"></div>
+            {/* Ambient light glow inside the card */}
+            <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/5 via-transparent to-transparent pointer-events-none"></div>
             
-            <div className="space-y-4 relative z-10">
+            <div className="space-y-6 relative z-10">
               <div className="flex items-center gap-3">
                 <span className="p-2.5 rounded-xl bg-indigo-500/15 border border-indigo-500/20 text-indigo-300 text-xs font-bold uppercase tracking-wider">
-                  Our Solutions Matrix
+                  Corporate Profile
                 </span>
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               </div>
               
-              <h2 className="text-2xl sm:text-4xl font-black text-white leading-snug group-hover:text-indigo-200 transition-colors">
+              <h2 className="text-2xl sm:text-3xl font-black text-white leading-snug">
                 Talent Development, Talent Engagement &amp; Future Workforce Solutions
               </h2>
               
-              <p className="text-slate-300 text-xs sm:text-sm leading-relaxed max-w-xl">
-                Preparing individuals and connecting industry for South Africa's digital economy. Click here to read our full corporate profile, core mission statement, and flagship ecosystems.
+              <p className="text-slate-200 text-sm sm:text-base leading-relaxed">
+                Learn Win Grow Africa is a Talent Development, Talent Engagement and Future Workforce ecosystem that supports individuals throughout their lifelong learning journey from early childhood development to future leadership while enabling organisations to build sustainable relationships with current and future talent. Within this ecosystem, we are launching{' '}
+                <button
+                  onClick={() => onNavigateToView('splash')}
+                  className="text-indigo-400 hover:text-indigo-300 font-extrabold underline decoration-indigo-500/50 hover:decoration-indigo-300 transition-colors cursor-pointer inline-flex items-center gap-1"
+                >
+                  Careers Avalanche <ArrowRight className="w-3.5 h-3.5" />
+                </button>{' '}
+                as our flagship digital matching platform.
               </p>
             </div>
 
             <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-between text-xs font-bold text-slate-400 relative z-10" id="corp-trigger-footer">
-              <span className="group-hover:text-slate-300 transition-colors flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-indigo-400" /> Click to view company profile
-              </span>
-              <span className="text-indigo-400 group-hover:text-indigo-300 transition-colors flex items-center gap-1">
-                Read Profile <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              <button
+                onClick={() => setIsProfileOpen(true)}
+                className="bg-indigo-500/10 hover:bg-indigo-500/25 border border-indigo-500/30 px-4 py-2 rounded-xl text-xs font-bold text-indigo-300 hover:text-white transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <Sparkles className="w-3.5 h-3.5 animate-pulse" /> Click to view company profile
+              </button>
+              <span className="text-slate-500 font-mono font-bold text-[10px]">
+                Pty Ltd Reg: 2024/559030/07
               </span>
             </div>
-          </button>
+          </div>
         </motion.div>
 
         {/* Bottom indicator */}

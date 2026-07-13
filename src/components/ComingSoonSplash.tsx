@@ -104,14 +104,8 @@ export default function ComingSoonSplash({ onEnterApp, onNavigateToView }: Comin
       <main className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 flex-grow flex flex-col justify-center items-center w-full" id="coming-soon-main">
         
         <div className="flex flex-col items-center w-full">
-          {/* Logo and Brand Title with Owner Reference */}
+          {/* Brand Title with Owner Reference (Logo image removed) */}
           <div className="flex flex-col items-center gap-3 mb-6" id="careers-avalanche-hero-branding">
-            <img 
-              src="./careers_logo_concept_b_revised.jpg" 
-              alt="Careers Avalanche Logo" 
-              className="h-24 w-auto rounded-2xl border border-white/10 shadow-[0_0_30px_rgba(99,102,241,0.2)] object-contain"
-              referrerPolicy="no-referrer"
-            />
             <span className="text-sm font-extrabold tracking-[0.2em] text-indigo-300 uppercase">Careers Avalanche</span>
             <span className="text-[10px] font-bold tracking-[0.15em] text-slate-400 uppercase -mt-1">by Learn Win Grow Africa</span>
           </div>

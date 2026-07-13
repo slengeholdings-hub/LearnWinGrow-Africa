@@ -206,12 +206,6 @@ export default function RegistrationPage({ onNavigate, onUnlockDeveloper, isDeve
           <ArrowLeft className="w-4 h-4" /> Back to Home
         </button>
         <div className="flex items-center gap-2">
-          <img 
-            src="./careers_logo_concept_b_revised.jpg" 
-            alt="Careers Avalanche" 
-            className="h-6 w-auto rounded border border-white/10 shadow object-contain"
-            referrerPolicy="no-referrer"
-          />
           <span className="text-xs text-slate-200 font-extrabold tracking-tight">Careers Avalanche</span>
         </div>
       </header>
