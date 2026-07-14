@@ -18,7 +18,12 @@ import {
   BookOpen
 } from 'lucide-react';
 import { AppView } from '../types';
-import { registerPreRegistrant, getPreRegistrantByEmail } from '../lib/firebase';
+import { 
+  registerPreRegistrant, 
+  getPreRegistrantByEmail, 
+  verifyRegistrantOTP, 
+  completeRegistrantProfile 
+} from '../lib/firebase';
 
 interface RegistrationPageProps {
   onNavigate: (view: AppView) => void;
@@ -27,8 +32,8 @@ interface RegistrationPageProps {
 }
 
 export default function RegistrationPage({ onNavigate, onUnlockDeveloper, isDeveloper }: RegistrationPageProps) {
-  // Mode: 'register' | 'signin' | 'verify' | 'success' | 'dev_login'
-  const [mode, setMode] = useState<'register' | 'signin' | 'verify' | 'success' | 'dev_login'>('register');
+  // Mode: 'register' | 'signin' | 'verify' | 'profile_builder' | 'success'
+  const [mode, setMode] = useState<'register' | 'signin' | 'verify' | 'profile_builder' | 'success'>('register');
   const [role, setRole] = useState<'seeker' | 'partner'>('seeker');
   
   // Registration Form States
@@ -47,15 +52,17 @@ export default function RegistrationPage({ onNavigate, onUnlockDeveloper, isDeve
   // Sign In State
   const [signInEmail, setSignInEmail] = useState('');
   const [signInError, setSignInError] = useState('');
+  const [signInPassword, setSignInPassword] = useState('');
+  const [requirePasswordForSignIn, setRequirePasswordForSignIn] = useState(false);
   
   // Verification Code State
   const [verificationCode, setVerificationCode] = useState(['', '', '', '', '', '']);
   const [verificationError, setVerificationError] = useState('');
-  const [generatedCode, setGeneratedCode] = useState('123456'); // simulated default code
   
-  // Developer Passcode State
-  const [devPasscode, setDevPasscode] = useState('');
-  const [devError, setDevError] = useState('');
+  // Password / Profile Builder States
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
   
   // General Loading State
   const [isLoading, setIsLoading] = useState(false);
@@ -107,21 +114,21 @@ export default function RegistrationPage({ onNavigate, onUnlockDeveloper, isDeve
         ageRange: role === 'seeker' ? ageRange : undefined,
         race: role === 'seeker' ? race : undefined,
         nationality: role === 'seeker' ? nationality : undefined,
+        phone: phone.trim(),
+        verificationPref,
         timestamp: new Date().toISOString()
       });
 
-      setRegisteredUser({
-        ...user,
-        phone,
-        verificationPref
-      });
+      setRegisteredUser(user);
 
       localStorage.setItem('candidate_email', email.toLowerCase().trim());
       localStorage.setItem('candidate_name', name.trim());
       localStorage.setItem('my_referral_code', user.referralCode);
 
-      // Take user directly to the verified success page
-      setMode('success');
+      // Transition to verification mode
+      setVerificationCode(['', '', '', '', '', '']);
+      setVerificationError('');
+      setMode('verify');
     } catch (err) {
       console.error(err);
       alert("Registration failed. Please try again.");
@@ -141,16 +148,59 @@ export default function RegistrationPage({ onNavigate, onUnlockDeveloper, isDeve
       // Check if user is registered in secure Firebase Firestore!
       const user = await getPreRegistrantByEmail(signInEmail.trim());
       
-      if (user) {
-        setRegisteredUser(user);
-        localStorage.setItem('candidate_email', user.email);
-        localStorage.setItem('candidate_name', user.name);
-        localStorage.setItem('my_referral_code', user.referralCode);
-        
-        // Take user directly to the verified success page
+      if (!user) {
+        setSignInError("This email address is not registered. Please create an account to join the community.");
+        setIsLoading(false);
+        return;
+      }
+
+      setRegisteredUser(user);
+      localStorage.setItem('candidate_email', user.email);
+      localStorage.setItem('candidate_name', user.name);
+      localStorage.setItem('my_referral_code', user.referralCode);
+      
+      // Case A: User registered but not verified yet
+      if (!user.verified) {
+        // Regenerate and trigger a new OTP
+        const updatedUser = await registerPreRegistrant({
+          email: user.email,
+          role: user.role,
+          name: user.name,
+          province: user.province,
+          ageRange: user.ageRange,
+          race: user.race,
+          nationality: user.nationality,
+          phone: user.phone,
+          verificationPref: user.verificationPref || 'email',
+          timestamp: new Date().toISOString()
+        });
+        setRegisteredUser(updatedUser);
+        setVerificationCode(['', '', '', '', '', '']);
+        setVerificationError('');
+        setMode('verify');
+        setIsLoading(false);
+        return;
+      }
+
+      // Case B: User verified but has not completed profile / password yet
+      if (!user.profileCompleted || !user.password) {
+        setMode('profile_builder');
+        setIsLoading(false);
+        return;
+      }
+
+      // Case C: User is fully registered. We need password to sign in!
+      if (!requirePasswordForSignIn) {
+        setRequirePasswordForSignIn(true);
+        setIsLoading(false);
+        return;
+      }
+
+      // If password field is already visible and submitted, check it
+      if (user.password === signInPassword.trim()) {
         setMode('success');
       } else {
-        setSignInError("This email address is not registered. Please create an account to join the community.");
+        setSignInError("Incorrect password. Please try again.");
       }
     } catch (err) {
       console.error(err);
@@ -161,7 +211,7 @@ export default function RegistrationPage({ onNavigate, onUnlockDeveloper, isDeve
   };
 
   // Verify Code
-  const handleVerifySubmit = (e: React.FormEvent) => {
+  const handleVerifySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const enteredCode = verificationCode.join('');
     
@@ -171,21 +221,103 @@ export default function RegistrationPage({ onNavigate, onUnlockDeveloper, isDeve
     }
 
     setIsLoading(true);
-    // Simulate verification check (accepts any code but validates correct feedback)
-    setTimeout(() => {
+    setVerificationError('');
+    try {
+      const targetEmail = registeredUser?.email || email || '';
+      const ok = await verifyRegistrantOTP(targetEmail, enteredCode);
+      
+      if (ok) {
+        // Fetch full updated user to see if they already completed profile
+        const updatedUser = await getPreRegistrantByEmail(targetEmail);
+        if (updatedUser) {
+          setRegisteredUser(updatedUser);
+        }
+        
+        // Go to profile builder to set password if not completed, else go to success
+        if (!updatedUser?.profileCompleted || !updatedUser?.password) {
+          setMode('profile_builder');
+        } else {
+          setMode('success');
+        }
+      } else {
+        setVerificationError('Invalid verification code. Please check the code or use the prototype bypass (777777).');
+      }
+    } catch (err) {
+      console.error(err);
+      setVerificationError('Verification failed. Please try again.');
+    } finally {
       setIsLoading(false);
-      setMode('success');
-    }, 1200);
+    }
   };
 
-  // Dev Login
-  const handleDevLoginSubmit = (e: React.FormEvent) => {
+  // Submit Profile Builder and Password details
+  const handleProfileBuilderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (devPasscode === '1001' || devPasscode === '2026' || devPasscode.toLowerCase() === 'admin') {
-      onUnlockDeveloper(true);
-      onNavigate('landing'); // Take developer to the workspace backend
-    } else {
-      setDevError('Invalid developer passcode. Please try again.');
+    if (password.length < 6) {
+      setPasswordError('Password must be at least 6 characters.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setPasswordError('Passwords do not match.');
+      return;
+    }
+
+    setIsLoading(true);
+    setPasswordError('');
+    try {
+      const targetEmail = registeredUser?.email || email || '';
+      const ok = await completeRegistrantProfile(targetEmail, password, {
+        province,
+        ageRange: role === 'seeker' ? ageRange : undefined,
+        race: role === 'seeker' ? race : undefined,
+        nationality: role === 'seeker' ? nationality : undefined,
+      });
+
+      if (ok) {
+        const updatedUser = await getPreRegistrantByEmail(targetEmail);
+        if (updatedUser) {
+          setRegisteredUser(updatedUser);
+        }
+        setMode('success');
+      } else {
+        setPasswordError('Failed to complete profile. Please try again.');
+      }
+    } catch (err) {
+      console.error(err);
+      setPasswordError('An error occurred while saving your password.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle Resending verification OTP
+  const handleResendCode = async () => {
+    setIsLoading(true);
+    setVerificationError('');
+    try {
+      const targetEmail = registeredUser?.email || email || '';
+      const user = await getPreRegistrantByEmail(targetEmail);
+      if (user) {
+        const updatedUser = await registerPreRegistrant({
+          email: user.email,
+          role: user.role,
+          name: user.name,
+          province: user.province,
+          ageRange: user.ageRange,
+          race: user.race,
+          nationality: user.nationality,
+          phone: user.phone,
+          verificationPref: user.verificationPref || 'email',
+          timestamp: new Date().toISOString()
+        });
+        setRegisteredUser(updatedUser);
+        alert(`A new verification code has been generated and sent to ${targetEmail}!`);
+      }
+    } catch (err) {
+      console.error(err);
+      setVerificationError('Failed to resend code. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -443,12 +575,6 @@ export default function RegistrationPage({ onNavigate, onUnlockDeveloper, isDeve
                 >
                   Already registered? Sign In to verify status
                 </button>
-                <button
-                  onClick={() => setMode('dev_login')}
-                  className="text-[10px] text-slate-500 hover:text-slate-400 font-bold tracking-wider uppercase mt-1 flex items-center justify-center gap-1"
-                >
-                  <Lock className="w-3 h-3" /> Developer Access
-                </button>
               </div>
             </motion.div>
           )}
@@ -466,7 +592,9 @@ export default function RegistrationPage({ onNavigate, onUnlockDeveloper, isDeve
               <div className="text-center space-y-2">
                 <h2 className="text-2xl font-black text-white tracking-tight">Sign In</h2>
                 <p className="text-xs text-slate-400 max-w-xs mx-auto">
-                  Enter your email address to access your registration status or verify your account details.
+                  {requirePasswordForSignIn 
+                    ? "Verify your password to log in to your Careers Avalanche account." 
+                    : "Enter your email address to access your registration status or verify your account details."}
                 </p>
               </div>
 
@@ -480,13 +608,34 @@ export default function RegistrationPage({ onNavigate, onUnlockDeveloper, isDeve
                     <input
                       type="email"
                       required
+                      disabled={requirePasswordForSignIn}
                       value={signInEmail}
                       onChange={(e) => setSignInEmail(e.target.value)}
                       placeholder="e.g. sipho@example.co.za"
-                      className="w-full bg-slate-950/60 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-xs text-white placeholder-slate-600 outline-none focus:border-indigo-500 font-semibold"
+                      className="w-full bg-slate-950/60 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-xs text-white placeholder-slate-600 outline-none focus:border-indigo-500 font-semibold disabled:opacity-60"
                     />
                   </div>
                 </div>
+
+                {requirePasswordForSignIn && (
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      Enter Password
+                    </label>
+                    <div className="relative">
+                      <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-500" />
+                      <input
+                        type="password"
+                        required
+                        value={signInPassword}
+                        onChange={(e) => setSignInPassword(e.target.value)}
+                        placeholder="Enter your profile password..."
+                        className="w-full bg-slate-950/60 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-xs text-white placeholder-slate-600 outline-none focus:border-indigo-500 font-semibold focus:border-indigo-500"
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {signInError && (
                   <div className="text-red-400 text-xs font-bold text-center flex items-center justify-center gap-1.5 bg-red-500/10 p-2.5 rounded-xl border border-red-500/20">
@@ -503,23 +652,36 @@ export default function RegistrationPage({ onNavigate, onUnlockDeveloper, isDeve
                   {isLoading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
-                    <span>Sign In</span>
+                    <span>{requirePasswordForSignIn ? 'Sign In Securely' : 'Proceed'}</span>
                   )}
                 </button>
+
+                {requirePasswordForSignIn && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRequirePasswordForSignIn(false);
+                      setSignInPassword('');
+                      setSignInError('');
+                    }}
+                    className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold block mx-auto pt-2 hover:underline"
+                  >
+                    Change Email Account
+                  </button>
+                )}
               </form>
 
               <div className="flex flex-col gap-2 pt-2 border-t border-white/5 text-center">
                 <button
-                  onClick={() => setMode('register')}
+                  onClick={() => {
+                    setMode('register');
+                    setRequirePasswordForSignIn(false);
+                    setSignInPassword('');
+                    setSignInError('');
+                  }}
                   className="text-xs text-indigo-300 hover:text-indigo-200 font-semibold"
                 >
                   Don't have an account? Register Now
-                </button>
-                <button
-                  onClick={() => setMode('dev_login')}
-                  className="text-[10px] text-slate-500 hover:text-slate-400 font-bold tracking-wider uppercase mt-1 flex items-center justify-center gap-1"
-                >
-                  <Lock className="w-3 h-3" /> Developer Access
                 </button>
               </div>
             </motion.div>
@@ -549,7 +711,7 @@ export default function RegistrationPage({ onNavigate, onUnlockDeveloper, isDeve
               <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-3.5 text-center text-xs">
                 <span className="text-[10px] font-extrabold text-indigo-300 uppercase tracking-widest block mb-1">Prototype Simulator Alert</span>
                 <p className="text-slate-300 text-[11px] leading-relaxed">
-                  To complete registration, use verification code: <strong className="font-mono text-emerald-400 text-sm bg-slate-950 px-2 py-0.5 rounded border border-white/5">{generatedCode}</strong>
+                  To complete registration, use verification code: <strong className="font-mono text-emerald-400 text-sm bg-slate-950 px-2 py-0.5 rounded border border-white/5">{registeredUser?.verificationCode || 'Calculating...'}</strong>
                 </p>
               </div>
 
@@ -593,16 +755,157 @@ export default function RegistrationPage({ onNavigate, onUnlockDeveloper, isDeve
 
               <div className="text-center">
                 <button
-                  onClick={() => {
-                    const newMock = Math.floor(100000 + Math.random() * 900000).toString();
-                    setGeneratedCode(newMock);
-                    alert(`New verification code sent!`);
-                  }}
-                  className="text-xs text-indigo-300 hover:text-indigo-200 font-semibold underline"
+                  onClick={handleResendCode}
+                  disabled={isLoading}
+                  className="text-xs text-indigo-300 hover:text-indigo-200 font-semibold underline disabled:opacity-50"
                 >
                   Resend Code
                 </button>
               </div>
+            </motion.div>
+          )}
+
+          {/* PROFILE BUILDER MODE */}
+          {mode === 'profile_builder' && (
+            <motion.div
+              key="profile_builder"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              className="bg-slate-900/60 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-md shadow-2xl space-y-6"
+              id="profile-builder-card"
+            >
+              <div className="text-center space-y-2">
+                <div className="w-12 h-12 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-full flex items-center justify-center mx-auto shadow-lg shadow-indigo-500/10">
+                  <ShieldCheck className="w-6 h-6" />
+                </div>
+                <h2 className="text-2xl font-black text-white tracking-tight">Complete Profile</h2>
+                <p className="text-xs text-slate-400 max-w-xs mx-auto">
+                  Create a secure password to complete your account setup and unlock the Careers Avalanche platform.
+                </p>
+              </div>
+
+              <form onSubmit={handleProfileBuilderSubmit} className="space-y-4">
+                {/* Email Indicator */}
+                <div className="bg-slate-950/60 border border-white/5 rounded-xl px-4 py-2.5 flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Email Account</span>
+                  <span className="text-xs font-semibold text-indigo-300">{registeredUser?.email || email}</span>
+                </div>
+
+                {/* Password */}
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Create Password
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-500" />
+                    <input
+                      type="password"
+                      required
+                      minLength={6}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="At least 6 characters..."
+                      className="w-full bg-slate-950/60 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-xs text-white placeholder-slate-600 outline-none focus:border-indigo-500 font-semibold"
+                    />
+                  </div>
+                </div>
+
+                {/* Confirm Password */}
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Confirm Password
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-500" />
+                    <input
+                      type="password"
+                      required
+                      minLength={6}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Repeat your password..."
+                      className="w-full bg-slate-950/60 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-xs text-white placeholder-slate-600 outline-none focus:border-indigo-500 font-semibold"
+                    />
+                  </div>
+                </div>
+
+                {/* Profile Confirmation fields */}
+                <div className="space-y-2 pt-2 border-t border-white/5">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Confirm Demographic Profile</span>
+                  
+                  <div className="space-y-1">
+                    <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Province</label>
+                    <select
+                      value={province}
+                      onChange={(e) => setProvince(e.target.value)}
+                      className="w-full bg-slate-950/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-slate-200 outline-none focus:border-indigo-500 font-semibold"
+                    >
+                      <option value="Gauteng">Gauteng</option>
+                      <option value="Western Cape">Western Cape</option>
+                      <option value="KwaZulu-Natal">KwaZulu-Natal</option>
+                      <option value="Eastern Cape">Eastern Cape</option>
+                      <option value="Free State">Free State</option>
+                      <option value="Limpopo">Limpopo</option>
+                      <option value="Mpumalanga">Mpumalanga</option>
+                      <option value="Northern Cape">Northern Cape</option>
+                      <option value="North West">North West</option>
+                    </select>
+                  </div>
+
+                  {role === 'seeker' && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Age Range</label>
+                        <select
+                          value={ageRange}
+                          onChange={(e) => setAgeRange(e.target.value)}
+                          className="w-full bg-slate-950/60 border border-white/10 rounded-lg px-2 py-1.5 text-[11px] text-slate-200 outline-none focus:border-indigo-500 font-semibold"
+                        >
+                          <option value="18-24 (Early Youth)">18-24</option>
+                          <option value="25-29 (Developing)">25-29</option>
+                          <option value="30-35 (Senior Youth)">30-35</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Race</label>
+                        <select
+                          value={race}
+                          onChange={(e) => setRace(e.target.value)}
+                          className="w-full bg-slate-950/60 border border-white/10 rounded-lg px-2 py-1.5 text-[11px] text-slate-200 outline-none focus:border-indigo-500 font-semibold"
+                        >
+                          <option value="Black African">Black African</option>
+                          <option value="Coloured">Coloured</option>
+                          <option value="Indian / Asian">Indian / Asian</option>
+                          <option value="White">White</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {passwordError && (
+                  <div className="text-red-400 text-xs font-bold text-center flex items-center justify-center gap-1.5 bg-red-500/10 p-2.5 rounded-xl border border-red-500/20">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>{passwordError}</span>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full bg-gradient-to-r from-indigo-500 to-purple-500 hover:brightness-110 text-white font-extrabold text-xs px-6 py-3.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                >
+                  {isLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>Complete Account Setup</span>
+                    </>
+                  )}
+                </button>
+              </form>
             </motion.div>
           )}
 
@@ -691,74 +994,6 @@ export default function RegistrationPage({ onNavigate, onUnlockDeveloper, isDeve
                   className="text-xs text-slate-400 hover:text-white font-semibold underline mt-1"
                 >
                   Register Another Account
-                </button>
-              </div>
-            </motion.div>
-          )}
-
-          {/* DEVELOPER LOGIN MODE */}
-          {mode === 'dev_login' && (
-            <motion.div
-              key="dev_login"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              className="bg-slate-900/60 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-md shadow-2xl space-y-6"
-              id="dev-login-card"
-            >
-              <div className="text-center space-y-2">
-                <div className="w-12 h-12 bg-purple-500/10 border border-purple-500/20 text-purple-400 rounded-full flex items-center justify-center mx-auto shadow-lg shadow-purple-500/10">
-                  <ShieldCheck className="w-6 h-6 animate-pulse" />
-                </div>
-                <h2 className="text-2xl font-black text-white tracking-tight">Developer Portal</h2>
-                <p className="text-xs text-slate-400 max-w-xs mx-auto">
-                  Enter the secure developer passcode to unlock full platform dashboards, psychometric assessments, and partner portals.
-                </p>
-              </div>
-
-              <form onSubmit={handleDevLoginSubmit} className="space-y-4">
-                <div className="space-y-1">
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                    Developer Passcode
-                  </label>
-                  <div className="relative">
-                    <Key className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-500" />
-                    <input
-                      type="password"
-                      required
-                      value={devPasscode}
-                      onChange={(e) => {
-                        setDevPasscode(e.target.value);
-                        setDevError('');
-                      }}
-                      placeholder="Enter 4-digit passcode..."
-                      className="w-full bg-slate-950/60 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-xs text-white placeholder-slate-600 outline-none focus:border-indigo-500 font-semibold"
-                    />
-                  </div>
-                  <span className="text-[9px] text-slate-500 block pl-1">Hint: Enter passcode <strong className="text-indigo-400">1001</strong> or <strong className="text-indigo-400">2026</strong></span>
-                </div>
-
-                {devError && (
-                  <div className="text-red-400 text-[11px] font-bold text-center bg-red-500/10 p-2 rounded-xl border border-red-500/20">
-                    {devError}
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  className="w-full bg-gradient-to-r from-indigo-500 to-purple-500 hover:brightness-110 text-white font-extrabold text-xs px-6 py-3.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <Key className="w-4 h-4" />
-                  <span>Unlock Dev Backend</span>
-                </button>
-              </form>
-
-              <div className="text-center pt-2 border-t border-white/5">
-                <button
-                  onClick={() => setMode('register')}
-                  className="text-xs text-indigo-300 hover:text-indigo-200 font-semibold"
-                >
-                  ← Back to Registration Form
                 </button>
               </div>
             </motion.div>

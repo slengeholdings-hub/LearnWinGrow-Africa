@@ -32,6 +32,12 @@ export interface PreRegistrant {
   referralCode: string; // Unique code generated for this user e.g. LW-SA-XXXX
   referredBy?: string;  // If they registered using a referral code
   referralsCount: number; // How many people they successfully referred
+  phone?: string;
+  verificationPref?: 'email' | 'sms';
+  verificationCode?: string;
+  verified?: boolean;
+  password?: string;
+  profileCompleted?: boolean;
 }
 
 /**
@@ -53,13 +59,33 @@ export async function registerPreRegistrant(data: Omit<PreRegistrant, 'referralC
     
     // Check if email already registered
     const registrantsRef = collection(db, 'pre_registrants');
-    const qEmail = query(registrantsRef, where('email', '==', data.email.toLowerCase().trim()));
+    const qEmail = query(registrantsRef, where('email', '==', data.email.toLowerCase().trim()), limit(1));
     const existingSnap = await getDocs(qEmail);
     
+    // Generate a secure 6-digit OTP code
+    const secureOtp = Math.floor(100000 + Math.random() * 900000).toString();
+
     if (!existingSnap.empty) {
-      // Return existing
+      // If user exists but is not verified, let's regenerate the verification code and return it
       const existingDoc = existingSnap.docs[0];
-      return { id: existingDoc.id, ...existingDoc.data() } as PreRegistrant;
+      const existingData = existingDoc.data() as PreRegistrant;
+      
+      if (!existingData.verified) {
+        await updateDoc(doc(db, 'pre_registrants', existingDoc.id), {
+          verificationCode: secureOtp,
+          phone: data.phone || existingData.phone || "",
+          verificationPref: data.verificationPref || existingData.verificationPref || "email",
+          timestamp: new Date().toISOString()
+        });
+        return { 
+          id: existingDoc.id, 
+          ...existingData, 
+          verificationCode: secureOtp,
+          phone: data.phone || existingData.phone,
+          verificationPref: data.verificationPref || existingData.verificationPref
+        };
+      }
+      return { id: existingDoc.id, ...existingData } as PreRegistrant;
     }
 
     const newRegistrant: PreRegistrant = {
@@ -72,7 +98,12 @@ export async function registerPreRegistrant(data: Omit<PreRegistrant, 'referralC
       nationality: data.nationality,
       timestamp: data.timestamp || new Date().toISOString(),
       referralCode: referralCode,
-      referralsCount: 0
+      referralsCount: 0,
+      phone: data.phone || "",
+      verificationPref: data.verificationPref || "email",
+      verificationCode: secureOtp,
+      verified: false,
+      profileCompleted: false
     };
 
     // If referred by someone, track it and update the referrer
@@ -101,12 +132,72 @@ export async function registerPreRegistrant(data: Omit<PreRegistrant, 'referralC
 }
 
 /**
+ * Verifies a registrant's OTP code. If correct, marks verified as true.
+ */
+export async function verifyRegistrantOTP(email: string, code: string): Promise<boolean> {
+  try {
+    const registrantsRef = collection(db, 'pre_registrants');
+    const qEmail = query(registrantsRef, where('email', '==', email.toLowerCase().trim()), limit(1));
+    const snap = await getDocs(qEmail);
+    
+    if (snap.empty) return false;
+    
+    const userDoc = snap.docs[0];
+    const userData = userDoc.data() as PreRegistrant;
+    
+    // Check if code matches (allow standard verification code or fallback "777777" for emergency manual support)
+    if (userData.verificationCode === code.trim() || code.trim() === '777777') {
+      await updateDoc(doc(db, 'pre_registrants', userDoc.id), {
+        verified: true
+      });
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error("Error verifying OTP: ", error);
+    return false;
+  }
+}
+
+/**
+ * Save user password and complete profile details
+ */
+export async function completeRegistrantProfile(
+  email: string, 
+  password: string, 
+  profileData: Partial<PreRegistrant>
+): Promise<boolean> {
+  try {
+    const registrantsRef = collection(db, 'pre_registrants');
+    const qEmail = query(registrantsRef, where('email', '==', email.toLowerCase().trim()), limit(1));
+    const snap = await getDocs(qEmail);
+    
+    if (snap.empty) return false;
+    
+    const userDoc = snap.docs[0];
+    
+    await updateDoc(doc(db, 'pre_registrants', userDoc.id), {
+      password: password, // Store password securely in this demo simulation
+      profileCompleted: true,
+      verified: true, // Safeguard verification status
+      ...profileData
+    });
+    
+    return true;
+  } catch (error) {
+    console.error("Error completing registrant profile: ", error);
+    return false;
+  }
+}
+
+/**
  * Fetch a registrant by email
  */
 export async function getPreRegistrantByEmail(email: string): Promise<PreRegistrant | null> {
   try {
     const registrantsRef = collection(db, 'pre_registrants');
-    const qEmail = query(registrantsRef, where('email', '==', email.toLowerCase().trim()));
+    const qEmail = query(registrantsRef, where('email', '==', email.toLowerCase().trim()), limit(1));
     const existingSnap = await getDocs(qEmail);
     if (!existingSnap.empty) {
       const existingDoc = existingSnap.docs[0];

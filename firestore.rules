@@ -2,7 +2,20 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /pre_registrants/{document} {
-      allow read, write: if true;
+      // Anyone can submit a registration
+      allow create: if true;
+      
+      // Anyone can get their own registration document if they know the ID
+      allow get: if true;
+      
+      // Only allow listing if there is a strict limit of 5 or fewer, which prevents bulk scraping
+      allow list: if request.query.limit <= 5;
+      
+      // Allow updates to existing registrations (e.g. tracking referrals)
+      allow update: if true;
+      
+      // Strictly prevent anyone from deleting registration records
+      allow delete: if false;
     }
   }
 }

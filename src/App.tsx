@@ -30,8 +30,14 @@ export default function App() {
     return 'splash';
   });
   
-  // Developer Mode to access building backend
+  // Developer Mode to access building backend (only enabled via secret ?dev=slengeholdings URL query)
   const [isDeveloper, setIsDeveloper] = useState<boolean>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const devParam = params.get('dev');
+    if (devParam === 'slengeholdings') {
+      localStorage.setItem('is_developer', 'true');
+      return true;
+    }
     return localStorage.getItem('is_developer') === 'true';
   });
 
