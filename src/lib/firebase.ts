@@ -101,6 +101,25 @@ export async function registerPreRegistrant(data: Omit<PreRegistrant, 'referralC
 }
 
 /**
+ * Fetch a registrant by email
+ */
+export async function getPreRegistrantByEmail(email: string): Promise<PreRegistrant | null> {
+  try {
+    const registrantsRef = collection(db, 'pre_registrants');
+    const qEmail = query(registrantsRef, where('email', '==', email.toLowerCase().trim()));
+    const existingSnap = await getDocs(qEmail);
+    if (!existingSnap.empty) {
+      const existingDoc = existingSnap.docs[0];
+      return { id: existingDoc.id, ...existingDoc.data() } as PreRegistrant;
+    }
+    return null;
+  } catch (error) {
+    console.error("Error finding pre-registrant: ", error);
+    throw error;
+  }
+}
+
+/**
  * Fetch total registration counts and latest subscribers
  */
 export async function getTeaserStats() {

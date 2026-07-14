@@ -272,7 +272,7 @@ export default function CareersBlog({ onNavigate, isDeveloper = false }: Careers
               onClick={() => onNavigate(isDeveloper ? 'assessment' : 'register')} 
               className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-lg shadow-indigo-500/20 hover:brightness-110 transition-all"
             >
-              {isDeveloper ? 'Take Test' : 'Join Waitlist'}
+              {isDeveloper ? 'Take Test' : 'Get Started'}
             </button>
           </div>
         </div>

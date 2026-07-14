@@ -151,7 +151,7 @@ export default function ComingSoonSplash({ onEnterApp, onNavigateToView }: Comin
             </div>
           </div>
 
-          {/* Sleek Central CTA Card (Highly focused on Waitlist signups) */}
+          {/* Sleek Central CTA Card (Highly focused on Community signups) */}
           <div
             className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 max-w-xl w-full backdrop-blur-md shadow-2xl relative text-center space-y-6 mb-12"
             id="main-cta-container"
@@ -161,7 +161,7 @@ export default function ComingSoonSplash({ onEnterApp, onNavigateToView }: Comin
             </div>
 
             <div className="space-y-2 pt-2">
-              <h3 className="text-xl font-black text-white">Join the Standby Waitlist Today</h3>
+              <h3 className="text-xl font-black text-white">Join the Careers Avalanche Community</h3>
               <p className="text-xs text-slate-300 leading-relaxed max-w-md mx-auto">
                 Whether you are a job seeker looking to discover future skills or an employer searching for verified South African talent, secure your early access today.
               </p>
@@ -173,7 +173,7 @@ export default function ComingSoonSplash({ onEnterApp, onNavigateToView }: Comin
                 className="group flex-grow bg-gradient-to-r from-indigo-500 to-purple-500 hover:brightness-110 text-white font-extrabold text-xs px-5 py-4 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
                 id="btn-goto-registration"
               >
-                <span>Access Interactive Waitlist</span>
+                <span>Talent Hub | Join the Community</span>
                 <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
               </button>
               <button

@@ -18,7 +18,7 @@ import {
   BookOpen
 } from 'lucide-react';
 import { AppView } from '../types';
-import { registerPreRegistrant } from '../lib/firebase';
+import { registerPreRegistrant, getPreRegistrantByEmail } from '../lib/firebase';
 
 interface RegistrationPageProps {
   onNavigate: (view: AppView) => void;
@@ -46,6 +46,7 @@ export default function RegistrationPage({ onNavigate, onUnlockDeveloper, isDeve
   
   // Sign In State
   const [signInEmail, setSignInEmail] = useState('');
+  const [signInError, setSignInError] = useState('');
   
   // Verification Code State
   const [verificationCode, setVerificationCode] = useState(['', '', '', '', '', '']);
@@ -109,9 +110,6 @@ export default function RegistrationPage({ onNavigate, onUnlockDeveloper, isDeve
         timestamp: new Date().toISOString()
       });
 
-      // Save additional phone and verification details locally
-      const mockCode = Math.floor(100000 + Math.random() * 900000).toString();
-      setGeneratedCode(mockCode);
       setRegisteredUser({
         ...user,
         phone,
@@ -122,8 +120,8 @@ export default function RegistrationPage({ onNavigate, onUnlockDeveloper, isDeve
       localStorage.setItem('candidate_name', name.trim());
       localStorage.setItem('my_referral_code', user.referralCode);
 
-      // Trigger verification screen
-      setMode('verify');
+      // Take user directly to the verified success page
+      setMode('success');
     } catch (err) {
       console.error(err);
       alert("Registration failed. Please try again.");
@@ -138,23 +136,25 @@ export default function RegistrationPage({ onNavigate, onUnlockDeveloper, isDeve
     if (!signInEmail.trim() || !signInEmail.includes('@')) return;
 
     setIsLoading(true);
+    setSignInError('');
     try {
-      // Simulate/Check if registered by calling Firestore
-      const mockCode = Math.floor(100000 + Math.random() * 900000).toString();
-      setGeneratedCode(mockCode);
+      // Check if user is registered in secure Firebase Firestore!
+      const user = await getPreRegistrantByEmail(signInEmail.trim());
       
-      setRegisteredUser({
-        name: signInEmail.split('@')[0],
-        email: signInEmail.toLowerCase().trim(),
-        role: 'seeker',
-        province: 'Gauteng',
-        verificationPref: 'email',
-        referralCode: 'LW-SA-GLOBAL'
-      });
-
-      setMode('verify');
+      if (user) {
+        setRegisteredUser(user);
+        localStorage.setItem('candidate_email', user.email);
+        localStorage.setItem('candidate_name', user.name);
+        localStorage.setItem('my_referral_code', user.referralCode);
+        
+        // Take user directly to the verified success page
+        setMode('success');
+      } else {
+        setSignInError("This email address is not registered. Please create an account to join the community.");
+      }
     } catch (err) {
       console.error(err);
+      setSignInError("Unable to sign in. Please check your network and try again.");
     } finally {
       setIsLoading(false);
     }
@@ -228,7 +228,7 @@ export default function RegistrationPage({ onNavigate, onUnlockDeveloper, isDeve
               <div className="text-center space-y-2">
                 <h2 className="text-2xl font-black text-white tracking-tight">Create Your Account</h2>
                 <p className="text-xs text-slate-400 max-w-xs mx-auto">
-                  Register today to join the waitlist and secure priority talent-matching matching opportunities on 1 October 2026.
+                  Register today to join the Careers Avalanche community and enjoy priority access to talent-matching opportunities
                 </p>
               </div>
 
@@ -429,7 +429,7 @@ export default function RegistrationPage({ onNavigate, onUnlockDeveloper, isDeve
                     </>
                   ) : (
                     <>
-                      <span>Submit & Send Verification Code</span>
+                      <span>Get Started</span>
                       <Send className="w-3.5 h-3.5" />
                     </>
                   )}
@@ -488,6 +488,13 @@ export default function RegistrationPage({ onNavigate, onUnlockDeveloper, isDeve
                   </div>
                 </div>
 
+                {signInError && (
+                  <div className="text-red-400 text-xs font-bold text-center flex items-center justify-center gap-1.5 bg-red-500/10 p-2.5 rounded-xl border border-red-500/20">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>{signInError}</span>
+                  </div>
+                )}
+
                 <button
                   type="submit"
                   disabled={isLoading}
@@ -496,7 +503,7 @@ export default function RegistrationPage({ onNavigate, onUnlockDeveloper, isDeve
                   {isLoading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
-                    <span>Send Verification Code</span>
+                    <span>Sign In</span>
                   )}
                 </button>
               </form>
@@ -762,7 +769,7 @@ export default function RegistrationPage({ onNavigate, onUnlockDeveloper, isDeve
 
       {/* Footer */}
       <footer className="relative z-10 py-6 text-center text-slate-500 text-[10px]">
-        <p>© 2026 LearnWinGrow Africa (Pty) Ltd. Reg No: 2024/559030/07. All Rights Reserved.</p>
+        <p>© 2026 LearnWinGrow Africa. All Rights Reserved.</p>
       </footer>
     </div>
   );
