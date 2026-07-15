@@ -196,8 +196,14 @@ export default function RegistrationPage({ onNavigate, onUnlockDeveloper, isDeve
             pref: user.verificationPref
           })
         });
-        const resData = await response.json();
-        if (resData.success && resData.previewUrl) {
+        let resData;
+        try {
+          resData = await response.json();
+        } catch (jsonErr) {
+          console.error("Non-JSON API response in register submit: ", jsonErr);
+          resData = { success: false };
+        }
+        if (resData && resData.success && resData.previewUrl) {
           setEmailPreviewUrl(resData.previewUrl);
         }
       } catch (apiErr) {
@@ -268,8 +274,14 @@ export default function RegistrationPage({ onNavigate, onUnlockDeveloper, isDeve
               pref: updatedUser.verificationPref
             })
           });
-          const resData = await response.json();
-          if (resData.success && resData.previewUrl) {
+          let resData;
+          try {
+            resData = await response.json();
+          } catch (jsonErr) {
+            console.error("Non-JSON API response in sign in submit: ", jsonErr);
+            resData = { success: false };
+          }
+          if (resData && resData.success && resData.previewUrl) {
             setEmailPreviewUrl(resData.previewUrl);
           }
         } catch (apiErr) {
@@ -434,19 +446,35 @@ export default function RegistrationPage({ onNavigate, onUnlockDeveloper, isDeve
               pref: updatedUser.verificationPref
             })
           });
-          const resData = await response.json();
-          if (resData.success && resData.previewUrl) {
-            setEmailPreviewUrl(resData.previewUrl);
+
+          let resData;
+          try {
+            resData = await response.json();
+          } catch (jsonErr) {
+            console.error("Non-JSON API response in resend code: ", jsonErr);
+            resData = { success: false, message: "Gateway returned an unexpected non-JSON response." };
           }
-          setResendStatus({
-            type: 'success',
-            message: `A new secure verification code has been dispatched to ${targetEmail}!`
-          });
-        } catch (apiErr) {
-          console.error("Outbound API dispatch error: ", apiErr);
+
+          if (resData && resData.success) {
+            if (resData.previewUrl) {
+              setEmailPreviewUrl(resData.previewUrl);
+            }
+            setResendStatus({
+              type: 'success',
+              message: resData.message || `A new secure verification code has been dispatched to ${targetEmail}!`
+            });
+          } else {
+            console.warn("Outbound dispatcher returned un-successful response: ", resData);
+            setResendStatus({
+              type: 'error',
+              message: resData?.message || `The secure gateway reports that the code was generated but could not be delivered in real-time. Please use the sandbox interceptor on the right.`
+            });
+          }
+        } catch (apiErr: any) {
+          console.error("Outbound API dispatch network error: ", apiErr);
           setResendStatus({
             type: 'error',
-            message: `Verification code created but failed to dispatch through backend gateway.`
+            message: `Network error connecting to the secure gateway: ${apiErr.message || apiErr}. Please use the sandbox interceptor on the right.`
           });
         }
       }
@@ -1308,26 +1336,78 @@ export default function RegistrationPage({ onNavigate, onUnlockDeveloper, isDeve
                     </div>
                   </div>
 
-                  {/* Dev mode / Testing Inbox helper */}
-                  {emailPreviewUrl && (
-                    <div className="p-3 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl space-y-2 text-left">
+                  {/* DEVELOPER SANDBOX CONTROL HUB */}
+                  <div className="p-4 bg-indigo-500/5 border border-indigo-500/20 rounded-2xl text-left space-y-3.5 shadow-md">
+                    <div className="flex items-center justify-between border-b border-white/5 pb-2">
                       <div className="flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-spin" style={{ animationDuration: '4s' }} />
-                        <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">Active Sandbox Dispatcher</span>
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-spin" style={{ animationDuration: '6s' }} />
+                        <span className="text-[10px] font-black text-indigo-300 uppercase tracking-widest">Sandbox Gateway Control Hub</span>
                       </div>
-                      <p className="text-[10px] text-slate-400 leading-normal">
-                        Your server generated a real email! Click below to view the beautifully styled outbound message in the sandbox inbox:
-                      </p>
-                      <a
-                        href={emailPreviewUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[10.5px] py-2.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-1 cursor-pointer"
-                      >
-                        <Laptop className="w-3.5 h-3.5" /> View Outbound Sandbox Email
-                      </a>
+                      <span className="text-[9px] bg-indigo-500/15 text-indigo-300 px-1.5 py-0.5 rounded font-mono font-bold">STAGING</span>
                     </div>
-                  )}
+
+                    <div className="space-y-2.5">
+                      <p className="text-[10.5px] text-slate-400 leading-normal">
+                        To enable seamless diagnostic testing inside the AI Studio sandboxed environment, you can inspect and bypass the secure handshake below:
+                      </p>
+
+                      <div className="bg-slate-950 p-3 rounded-xl border border-white/5 flex items-center justify-between gap-2">
+                        <div className="space-y-0.5">
+                          <span className="text-[8px] text-slate-500 font-bold uppercase block">Intercepted OTP</span>
+                          <span className="text-sm font-mono font-black tracking-wider text-emerald-400 select-all">
+                            {registeredUser?.verificationCode || 'Calculating...'}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleAutofillOTP}
+                          className="px-2.5 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 hover:border-indigo-500/50 text-indigo-200 hover:text-white rounded-lg text-[10px] font-black transition-all flex items-center gap-1 cursor-pointer"
+                        >
+                          <Sparkles className="w-3 h-3 animate-pulse" />
+                          <span>Autofill Code</span>
+                        </button>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(registeredUser?.verificationCode || '')}
+                          className="w-1/2 px-2.5 py-2 bg-slate-950 hover:bg-slate-900 border border-white/5 hover:border-white/10 rounded-lg text-[10px] font-bold text-slate-300 hover:text-white transition-all flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          <Copy className="w-3.5 h-3.5 text-indigo-400" />
+                          <span>{isCopingCode ? 'Copied!' : 'Copy Code'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const codeArr = ['7','7','7','7','7','7'];
+                            setVerificationCode(codeArr);
+                            setVerificationError('');
+                            setHasAutofilled(true);
+                          }}
+                          className="w-1/2 px-2.5 py-2 bg-slate-950 hover:bg-slate-900 border border-white/5 hover:border-white/10 rounded-lg text-[10px] font-bold text-slate-300 hover:text-white transition-all flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Bypass (777777)</span>
+                        </button>
+                      </div>
+
+                      {/* Outbound Sandbox Email button from Ethereal */}
+                      {emailPreviewUrl && (
+                        <div className="pt-2 border-t border-white/5">
+                          <a
+                            href={emailPreviewUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="w-full bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 hover:text-white font-black text-[10.5px] py-2.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <Laptop className="w-3.5 h-3.5" /> View Outbound Sandbox Email
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
                   <div className="text-[9px] text-slate-500 font-mono">
                     TRANSIT GATE: LEARN-WIN-GROW GLOBAL SECURE HANDSHAKE
